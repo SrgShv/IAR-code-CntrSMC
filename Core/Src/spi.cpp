@@ -105,7 +105,6 @@ void mainRunTime()
    uint8_t data1 = 0;
    if(RxFlgLAN)
    {
-      printf("LAN DMA RX <-\n");
       __disable_irq();
       RxFlgLAN = false;
       __enable_irq();
@@ -121,20 +120,14 @@ void mainRunTime()
 
       uint8_t *pDat = 0;
       uint16_t *pLen = 0;
-      //uint16_t *pNext = 0;
       if(pBuffRxLAN->onCheck())
       {
          if(pBuffRxLAN->onGetReadBuff(m_dPtr))
          {
-            //pNext = (uint16_t *)(&m_dPtr.data[1]);
-            //gNextPacketPtr = *pNext;
-            //pNext = (uint16_t *)(&m_dPtr.data[1]);
             gNextPacketPtr = *(uint16_t *)(&m_dPtr.data[1]);
             pDat = (uint8_t *)(&m_dPtr.data[7]);
             pLen = (uint16_t *)(&m_dPtr.data[3]);
             HandleLanSockets(pDat, (*pLen - 4));
-
-            printf("\n NextPtr = %d, Len = %d\n\r", (int)gNextPacketPtr, (int)(*pLen - 4));
          };
       };
    };
@@ -303,11 +296,11 @@ for(uint8_t i=0; i<10; i++)
    else break;
 };
 **/
-static bool nextFlgRX = false;
-void CEthernet::onRunTime(void)
-{
-   printf("start RX => \n\r");
-   pEthernet->m_pLanA->startRX();
+//static bool nextFlgRX = false;
+//void CEthernet::onRunTime(void)
+//{
+//   printf("start RX => \n\r");
+//   pEthernet->m_pLanA->startRX();
 //   nextFlgRX = true;
 //   uint32_t dCnt = 0;
 //   while(nextFlgRX)
@@ -318,35 +311,34 @@ void CEthernet::onRunTime(void)
 //      printf("++Land %d\n\r", dCnt);
 //      ++dCnt;
 //   };
-}
+//}
 
 void CEthernet::onTickRunTime(void)
 {
    this->m_pLanA->enc28j60_set_bank(EIR);
-   uint8_t fres = this->m_pLanA->enc28j60_read_op(ENC28J60_SPI_RCR, EIR);
+   this->m_pLanA->enc28j60_read_op(ENC28J60_SPI_RCR, EIR);
    if(this->m_pLanA->enc28j60_rcr(EPKTCNT) > 0)
    {
-      printf("<====+++++RX\n\r");
       pEthernet->m_pLanA->startRX();
    };
 
-   switch(stepLan_2)    /** - **/
-   {
-      case 1:
-         break;
-      case 2:
-         break;
-      case 3:
-         break;
-      case 4:
-         break;
-      case 5:
-         break;
-      case 6:
-         break;
-      default:
-         break;
-   };
+//   switch(stepLan_2)    /** - **/
+//   {
+//      case 1:
+//         break;
+//      case 2:
+//         break;
+//      case 3:
+//         break;
+//      case 4:
+//         break;
+//      case 5:
+//         break;
+//      case 6:
+//         break;
+//      default:
+//         break;
+//   };
 }
 
 bool CEthernet::onSend(uint8_t *data, uint16_t len)

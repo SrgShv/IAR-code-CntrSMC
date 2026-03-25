@@ -1343,6 +1343,7 @@ void main(void)
 //            if(pBuffRxLAN->onGetReadBuff(m_dPtr)) HandleLanSockets(m_dPtr.data, *(m_dPtr.byteCount));
 //         };
 //      };
+      mainRunTime();
 
       if(RxFlgUSART)
       {
@@ -1362,7 +1363,7 @@ void main(void)
          cntErrUSART = 0;
       };
 
-      mainRunTime();
+
 
 //      if(onGetIRQ_DMA_SPI3())
 //      {
