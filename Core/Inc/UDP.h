@@ -8,6 +8,8 @@
 #define LOCAL_SERVER_PORT     40001
 #define LOCAL_DEVICE_PORT     40100
 
+const uint16_t gm_max_sz_Eth = 600;
+
 #define  IDLE_MODE            1
 #define  BTTN_PRSD            2
 #define  SENT_STC             3

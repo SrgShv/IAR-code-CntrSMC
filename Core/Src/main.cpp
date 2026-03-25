@@ -83,14 +83,19 @@ uint8_t buffDataReqUID[100];
 CByteBuff mBuffMB(255);
 //CByteBuff mBuffPING(1600);
 dPTR m_dPtr;
+dPTR m_dPtrRx;
+dPTR m_dPtrTx;
 
 CByteBuff *pBuffMB = &mBuffMB;      // Pack buffer for send MBus req-t
 //CByteBuff *pBuffPING = &mBuffPING;
 CBuffLAN mBuffUSB(100, 3);
 CBuffLAN *pBuffUSB = &mBuffUSB;     // Pack buffer
 //CBuffLAN mBuffLAN(ENC28J60_MAXFRAME, 3);
-CBuffLAN mBuffLAN(3000, 2);
-CBuffLAN *pBuffLAN = &mBuffLAN;
+CBuffLAN mBuffRxLAN(gm_max_sz_Eth, 3); // max size: 600 Byte
+CBuffLAN *pBuffRxLAN = &mBuffRxLAN;
+
+CBuffLAN mBuffTxLAN(gm_max_sz_Eth, 3); // max size: 600 Byte
+CBuffLAN *pBuffTxLAN = &mBuffTxLAN;
 
 CFlash mFlashM;
 CFlash *pFlashM = &mFlashM;
@@ -155,6 +160,8 @@ static volatile bool RxFlgLAN = false;
 static volatile bool makeFlgReqUID = false;
 static volatile bool respFlgReqUID = false;
 
+static volatile bool RxFlgLAN_DMA = false;
+
 static volatile uint8_t gFlagARP_A = 0;
 uint8_t EthBuffRXA[RX_BUFF_SZ];
 uint16_t EthBffLenA = 0;
@@ -198,11 +205,23 @@ void tickTIMER(void)
 }
 /*****************************************************************************/
 
+
+void setOnIRQ(bool flg)
+{
+   if(flg) __enable_irq();
+   else __disable_irq();
+}
+
+void setFlgDMA_LAN_RX(bool flg)
+{
+   RxFlgLAN_DMA = flg;
+   printf("flg DMA LAN\n\r");
+}
 /*****************************************************************************/
 void setEnableTimerTX(uint32_t val)
 {
    onStartTimer3(val);
-};
+}
 /*****************************************************************************/
 
 /*****************************************************************************/
@@ -376,24 +395,25 @@ void EthernetSend(uint8_t *data, uint16_t len)
 /**   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   **/
 /*****************************************************************************/
 static bool nextFlgRX = false;
-//static bool crFlgRX = false;
+volatile static bool IrqFlgRX = false;
 void handleRxIrqLanA(void)
 {
+   IrqFlgRX = true;
    //++count_IRQ_LAN;
    //setStep(1, 1);
 //   /**
-   nextFlgRX = true;
-   for(uint8_t i=0; i<10; i++)
-   {
-      if(nextFlgRX)
-      {
-         if(pBuffLAN->onGetWriteBuff(m_dPtr))
-         {
-            pEthernet->m_pLanA->enc28j60_recv_packet(m_dPtr.data, m_dPtr.byteCount, nextFlgRX);
-         };
-      }
-      else break;
-   };
+//   nextFlgRX = true;
+//   for(uint8_t i=0; i<10; i++)
+//   {
+//      if(nextFlgRX)
+//      {
+//         if(pBuffLAN->onGetWriteBuff(m_dPtr))
+//         {
+//            pEthernet->m_pLanA->enc28j60_recv_packet(m_dPtr.data, m_dPtr.byteCount, nextFlgRX);
+//         };
+//      }
+//      else break;
+//   };
 //   **/
 }
 /*****************************************************************************/
@@ -567,7 +587,7 @@ void HandleLanSockets(uint8_t *data, uint16_t len)
 /**  Handle RX from LAN: select ARP or DHCP or ICMP or UDP-data **/
    bool check = true;
    uint8_t *pMAC = (uint8_t *)data;
-   //showPack(data, len);
+   showPack(data, len);
    /** Check and Handle ARP, DHCP, ICMP, UDP */
    if(0 == pArp->onCheckArpA(data, len))
    {                                                       /** RX pack - NOT ARP */
@@ -1114,6 +1134,8 @@ void WriteEEPROM(uint8_t *data, uint16_t len)
 /*****************************************************************************/
 void initAddrLAN(void)     // Read from EEPROM settings for init device
 {
+   
+   
    if(pFlashM->onCheckWritten())
    {
       //printf("init address from EEPROM\n");
@@ -1122,9 +1144,11 @@ void initAddrLAN(void)     // Read from EEPROM settings for init device
       {
          deviceMAC[i] = pMACA[i];
       };
+      //showMAC((char *)deviceMAC);
       /** get server IP of the user DataBase */
       servIPA = pFlashM->onGetSrvIPA();
       servUDB.serverIP = reverseDWORD(servIPA);
+      //showIP(servUDB.serverIP);
       servUDB.serverPort = LOCAL_SERVER_PORT;
       DeviceNumber = pFlashM->onGetDevNumb();
 //      sprintf(tstr, "T=%d, sec\n", (int)pFlashM->onGetSpeedRS485());
@@ -1302,7 +1326,23 @@ void main(void)
 //         **/
 //      };
 
-      pEthernet->onRunTime();
+      if(IrqFlgRX)
+      {
+         setOnIRQ(false);
+         IrqFlgRX = false;
+         setOnIRQ(true);
+         pEthernet->onRunTime();
+      };
+      
+//      if(RxFlgLAN_DMA)
+//      {
+//         RxFlgLAN_DMA = false;
+//         printf("LAN DMA RX <-\n");
+//         if(pBuffRxLAN->onCheck())
+//         {
+//            if(pBuffRxLAN->onGetReadBuff(m_dPtr)) HandleLanSockets(m_dPtr.data, *(m_dPtr.byteCount));
+//         };
+//      };
 
       if(RxFlgUSART)
       {
@@ -1321,6 +1361,8 @@ void main(void)
          ParseModbusRX(rxPackBuff, rxPackLen);
          cntErrUSART = 0;
       };
+      
+      mainRunTime();
 
 //      if(onGetIRQ_DMA_SPI3())
 //      {
@@ -1328,10 +1370,10 @@ void main(void)
 //         if(pBuffLAN->onGetReadBuff(m_dPtr)) HandleLanSockets(m_dPtr.data, *(m_dPtr.byteCount));
 //      };
 
-      if(pBuffLAN->onCheck())
-      {
-         if(pBuffLAN->onGetReadBuff(m_dPtr)) HandleLanSockets(m_dPtr.data, *(m_dPtr.byteCount));
-      };
+//      if(pBuffRxLAN->onCheck())
+//      {
+//         if(pBuffRxLAN->onGetReadBuff(m_dPtrRx)) HandleLanSockets(m_dPtrRx.data, *(m_dPtrRx.byteCount));
+//      };
 
       /** Start UDP request to UBD server over Ethernet LAN **/
       if(GetFlagServerUBD())
@@ -1386,6 +1428,7 @@ void main(void)
       {
          sysFlg = false;
          pEthernet->onTickRunTime();
+         mainTickRunTime();
 
 #ifdef   DEBUG_PRINT_1
          if(++controlTic > 1000)
@@ -1959,14 +2002,14 @@ void getDiagnosticReg16(bool stop, uint8_t adr, uint32_t len)
 
 void showPack(uint8_t *data, uint32_t len)
 {
-   printf("{ ");
+   printf("{\n");
    for(uint32_t i=0; i<len; i++)
    {
-      //printf("%d: 0x%02X\n", (int)i, (int)data[i]);
-      printf("0x%02X, ", (int)data[i]);
+      printf("%d: 0x%02X\n", (int)i, (int)data[i]);
+      //printf("0x%02X, ", (int)data[i]);
       //printf(tstr);
    };
-   printf(" }\n");
+   printf("}\n\r");
 }
 
 void showMAC(char *mac)

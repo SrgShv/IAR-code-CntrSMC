@@ -17,6 +17,7 @@ extern "C"
 
 //extern void assert_failed(uint8_t *file, uint32_t line);
 //extern void SetFlagServerUBD(bool val);
+extern void setOnIRQ(bool flg);
 extern void showMAC(char *mac);
 extern sServerUDB servUDB;
 extern void SetFlagServerUBD(bool val);
@@ -166,7 +167,10 @@ void CBuffLAN::onWrite(uint8_t *data, uint16_t len)
       };
       m_Len[m_wrtr] = len;
       if(++m_wrtr >= m_cntPack) m_wrtr = 0;
+      
+      setOnIRQ(false);
       ++m_cntr;
+      setOnIRQ(true);
    };
 }
 
@@ -177,7 +181,9 @@ bool CBuffLAN::onGetWriteBuff(dPTR &ptr)
       ptr.data = &(m_Buff[m_wrtr][0]);
       ptr.byteCount = &(m_Len[m_wrtr]);
       if(++m_wrtr >= m_cntPack) m_wrtr = 0;
+      setOnIRQ(false);
       ++m_cntr;
+      setOnIRQ(true);
       return true;
    };
    return 0;
@@ -190,7 +196,9 @@ bool CBuffLAN::onGetReadBuff(dPTR &ptr)
       ptr.data = &(m_Buff[m_read][0]);
       ptr.byteCount = &(m_Len[m_read]);
       if(++m_read >= m_cntPack) m_read = 0;
+      setOnIRQ(false);
       --m_cntr;
+      setOnIRQ(true);
       return true;
    };
    return false;
@@ -207,7 +215,9 @@ bool CBuffLAN::onRead(uint8_t *data, uint16_t &len)
           data[i] = m_Buff[m_read][i];
       };
       if(++m_read >= m_cntPack) m_read = 0;
+      setOnIRQ(false);
       --m_cntr;
+      setOnIRQ(true);
       if(len > 0) res = true;
    }
    else
@@ -276,7 +286,7 @@ void CArp::onInit(uint8_t *devMac)
 }
 
 //DebugHandler((char *)(__FILE__), (int)__LINE__);
-
+// get MAC address of the server from IP: 192.168.0.200
 char CArp::onCheckArpA(uint8_t *data, uint16_t len)                     // MAIN LAN A
 {
    char res = 0;

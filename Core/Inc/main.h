@@ -154,7 +154,7 @@ uint16_t reverseWORD(uint16_t d);
 void SetFlagServerUBD(bool val);
 bool GetFlagServerUBD(void);
 bool checkInitFlag(void);
-void HandleLanSockets(uint8_t *data, uint16_t len);
+//void HandleLanSockets(uint8_t *data, uint16_t len);
 bool CheckRxDeviceMAC(uint8_t *mac);
 bool CheckRxBroadcastMAC(uint8_t *mac);
 void HandleDhcpOffer(uint8_t *data, uint16_t len);
@@ -177,5 +177,7 @@ void WriteEEPROM(uint8_t *data, uint16_t len);
 //void StartTimeOutMBTX();
 //extern uint8_t CDC_Transmit_FS(uint8_t* Buf, uint16_t Len);
 void assert_failed(uint8_t *file, uint32_t line);
+void setOnIRQ(bool flg);
+
 
 #endif /* __MAIN_H */

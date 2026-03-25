@@ -41,9 +41,19 @@ extern "C"
 }
 extern void SystemReset(void);
 extern void onStartTimer4(uint32_t time);
-extern CBuffLAN *pBuffLAN;
+extern CBuffLAN *pBuffRxLAN;
+extern CBuffLAN *pBuffTxLAN;
 extern dPTR m_dPtr;
+extern dPTR m_dPtrRx;
+extern dPTR m_dPtrTx;
 extern CEthernet *pEthernet;
+
+//extern void setOnIRQ(bool flg);
+extern void mainRunTime();
+extern void mainTickRunTime();
+//extern void HandleLanSockets(uint8_t *data, uint16_t len);
+
+static uint16_t gNextPacketPtr = ENC28J60_RXSTART;
 
 static volatile uint8_t stepLan_1 = 0;
 static volatile uint8_t stepLan_2 = 0;
@@ -54,6 +64,7 @@ static volatile uint32_t timeLan_1 = 0;
 static volatile uint32_t timeLan_2 = 0;
 static volatile uint32_t timeLan_3 = 0;
 static volatile uint32_t timeLan_4 = 0;
+static volatile bool RxFlgLAN = false;
 
 //static bool     unreleasedPacket = false;
 
@@ -88,6 +99,28 @@ void setStep(uint8_t stepNo, uint8_t pos)
    };
 }
 
+void mainRunTime()
+{
+   if(RxFlgLAN)
+   {
+      __disable_irq();
+      RxFlgLAN = false;
+      __enable_irq();
+      printf("LAN DMA RX <-\n");
+      if(pBuffRxLAN->onCheck())
+      {
+         if(pBuffRxLAN->onGetReadBuff(m_dPtr))
+         {
+            HandleLanSockets(m_dPtr.data, *(m_dPtr.byteCount));
+         };
+      };
+   };
+};
+
+void mainTickRunTime() // 1 msec
+{
+};
+
 /* SPI3 init function */
 void MX_SPI3_Init(void)
 {
@@ -98,7 +131,7 @@ void MX_SPI3_Init(void)
   hspi3.Init.CLKPolarity = SPI_POLARITY_LOW;
   hspi3.Init.CLKPhase = SPI_PHASE_1EDGE;
   hspi3.Init.NSS = SPI_NSS_SOFT;
-  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_2;
+  hspi3.Init.BaudRatePrescaler = SPI_BAUDRATEPRESCALER_4;
   hspi3.Init.FirstBit = SPI_FIRSTBIT_MSB;
   hspi3.Init.TIMode = SPI_TIMODE_DISABLE;
   hspi3.Init.CRCCalculation = SPI_CRCCALCULATION_DISABLE;
@@ -133,8 +166,6 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
       GPIO_InitStruct.Alternate = GPIO_AF6_SPI3;
       HAL_GPIO_Init(GPIOC, &GPIO_InitStruct);
 
-
-#ifdef INIT_DMA_SPI3_SWITCH
       /* SPI3 DMA Init */
       /* SPI3_RX Init */
       hdma_spi3_rx.Instance = DMA1_Stream0;
@@ -154,28 +185,10 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
 
       __HAL_LINKDMA(spiHandle,hdmarx,hdma_spi3_rx);
 
-      HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 1, 0);
+      /* DMA1_Stream0_IRQn interrupt configuration */
+      HAL_NVIC_SetPriority(DMA1_Stream0_IRQn, 3, 2);
       HAL_NVIC_EnableIRQ(DMA1_Stream0_IRQn);
-#else
-      /* SPI3 DMA Init */
-      /* SPI3_RX Init */
-//      hdma_spi3_rx.Instance = DMA1_Stream0;
-//      hdma_spi3_rx.Init.Channel = DMA_CHANNEL_0;
-//      hdma_spi3_rx.Init.Direction = DMA_PERIPH_TO_MEMORY;
-//      hdma_spi3_rx.Init.PeriphInc = DMA_PINC_DISABLE;
-//      hdma_spi3_rx.Init.MemInc = DMA_MINC_ENABLE;
-//      hdma_spi3_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
-//      hdma_spi3_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-//      hdma_spi3_rx.Init.Mode = DMA_NORMAL;
-//      hdma_spi3_rx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
-//      hdma_spi3_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
-//      if (HAL_DMA_Init(&hdma_spi3_rx) != HAL_OK)
-//      {
-//         _Error_Handler((char *)__FILE__, __LINE__);
-//      }
 
-//      __HAL_LINKDMA(spiHandle,hdmarx,hdma_spi3_rx);
-#endif // INIT_DMA_SPI3_SWITCH
 
       /* SPI3_TX Init */
       hdma_spi3_tx.Instance = DMA1_Stream7;
@@ -185,7 +198,7 @@ void HAL_SPI_MspInit(SPI_HandleTypeDef* spiHandle)
       hdma_spi3_tx.Init.MemInc = DMA_MINC_ENABLE;
       hdma_spi3_tx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
       hdma_spi3_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-      hdma_spi3_tx.Init.Mode = DMA_NORMAL;
+      hdma_spi3_tx.Init.Mode = DMA_NORMAL; //DMA_CIRCULAR
       hdma_spi3_tx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
       hdma_spi3_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
       if (HAL_DMA_Init(&hdma_spi3_tx) != HAL_OK)
@@ -270,28 +283,18 @@ for(uint8_t i=0; i<10; i++)
 static bool nextFlgRX = false;
 void CEthernet::onRunTime(void)
 {
-   switch(stepLan_1)    /** RX DMA-SPI-LAN **/
-   {
-      case 1:           /** Set init RX buffer **/
-         pBuffLAN->onGetWriteBuff(m_dPtr);
-         pEthernet->m_pLanA->enc28j60_recv_packet(m_dPtr.data, m_dPtr.byteCount, nextFlgRX);
-         ++stepLan_1;
-         break;
-      case 2:
-         //pEthernet->m_pLanA->enc28j60_recv_packet(m_dPtr.data, m_dPtr.byteCount, nextFlgRX);
-         ++stepLan_1;
-         break;
-      case 3:
-         break;
-      case 4:
-         break;
-      case 5:
-         break;
-      case 6:
-         break;
-      default:
-         break;
-   };
+   printf("start RX => \n\r");
+   pEthernet->m_pLanA->startRX();
+//   nextFlgRX = true;
+//   uint32_t dCnt = 0;
+//   while(nextFlgRX)
+//   {
+//      pEthernet->m_pLanA->startRX();
+//      //pBuffLAN->onGetWriteBuff(m_dPtr);
+//      //pEthernet->m_pLanA->enc28j60_recv_packet(m_dPtr.data, m_dPtr.byteCount, nextFlgRX);
+//      printf("++Land %d\n\r", dCnt);
+//      ++dCnt;
+//   };
 }
 
 void CEthernet::onTickRunTime(void)
@@ -387,14 +390,14 @@ void CLAN::onInit(uint8_t *mac)
    delay_us(100);
 
    this->onSetSelect();
-   delay_us(20000);         //Ожидание окончания инициализации ENC28J60
+   delay_us(20000);         // ENC28J60
    this->onSetReset();
    delay_us(50000);
    this->onClrReset();
    delay_us(50000);
    this->onClrSelect();
 
-   delay_us(20000);         //Ожидание окончания инициализации ENC28J60
+   delay_us(20000);         // ENC28J60
    this->onSetReset();
    delay_us(50000);
    this->onClrReset();
@@ -481,6 +484,9 @@ void CLAN::onInit(uint8_t *mac)
    uint16_t revID = 0x00FF & enc28j60_rcr16(EREVID);
    //printf("rev ID: %d\r\n", revID);
 
+   enc28j60_wcr(ERDPTL, (0));          // Buffer read pointer L
+   enc28j60_wcr(ERDPTH, (0));          // Buffer read pointer H
+
    m_MacFlag = 1;
    //HAL_Delay(20);
    delay_us(20000);
@@ -507,17 +513,98 @@ uint16_t CLAN::onRecieve(uint8_t *data)
 }
 //*************************************CLAN******************************
 
-//*************************************CSPI******************************
+
 CSPI::CSPI() :
    m_mac(0),
    m_nextReadPtr(0),
-   m_enc28j60_current_bank(0)
+   m_enc28j60_current_bank(0),
+   lastRDPTR(0)
 {
 }
 
 CSPI::~CSPI()
 {
 }
+
+//*************************************CSPI******************************
+//void CSPI::init(SPI_HandleTypeDef* hspi)
+//{
+//    _hspi = hspi;
+//}
+
+bool CSPI::enqueue(SpiTransaction& t)
+{
+    uint8_t next = (head + 1) % SIZE;
+    if(next == tail) return false;
+
+    queuer[head] = t;
+    head = next;
+    startRX();
+    return true;
+}
+
+void CSPI::startRX()
+{
+   printf("StartRX DMA LAN\n\r");
+//    if (busy || head == tail) return;
+//
+//    current = queuer[tail];
+//    tail = (tail + 1) % SIZE;
+//   enc28j60_wcr(ERDPTL, (0));           // Buffer read pointer L
+//   enc28j60_wcr(ERDPTH, (0));           // Buffer read pointer H
+
+   pBuffTxLAN->onGetWriteBuff(m_dPtrTx);
+   m_dPtrTx.data[0] = ENC28J60_SPI_RBM;      // init Tx data
+   m_dPtrTx.byteCount[0] = gm_max_sz_Eth;
+   pBuffTxLAN->onGetReadBuff(m_dPtrTx);
+   pBuffRxLAN->onGetWriteBuff(m_dPtrRx);
+   m_dPtrRx.byteCount[0] = gm_max_sz_Eth;
+   busy = true;
+   //uint8_t *tPP = &m_dPtrRx.data[0];
+   //startTime = HAL_GetTick();
+   onSetSelect();
+   //HAL_SPI_TransmitReceive_DMA(&hspi3, m_dPtrTx.data, tPP, gm_max_sz_Eth);
+   HAL_SPI_TransmitReceive_DMA(&hspi3, m_dPtrTx.data, m_dPtrRx.data, gm_max_sz_Eth);
+   //HAL_SPI_TransmitReceive_DMA(&hspi3, m_dPtrTx.data, m_dPtrRx.data, 7);
+}
+
+/**
+m_dPtrRx.data:
+
+[0]  garbage
+[1]  NextPacketPtrL
+[2]  NextPacketPtrH
+[3]  PacketLengthL
+[4]  PacketLengthH
+[5]  StatusL
+[6]  StatusH
+[7]  Payload[0]
+[8]  Payload[1]
+...
+*/
+
+void CSPI::onDmaComplete()
+{
+   busy = false;
+   RxFlgLAN = true;
+   //setFlgDMA_LAN_RX(true);
+   onClrSelect();
+   printf("CallbackDMA_LAN\n\r");
+//   enc28j60_wcr(ERDPTL, (lastRDPTR)&0xFF);
+//   enc28j60_wcr(ERDPTH, (lastRDPTR)>>8);
+}
+
+void CSPI::watchdog(uint32_t now)
+{
+    if (busy && (now - startTime > 5))
+    {
+        __HAL_SPI_DISABLE(_hspi);
+        __HAL_SPI_ENABLE(_hspi);
+        busy = false;
+    }
+}
+
+//*************************************----******************************
 
 void CSPI::onInitSPI(char spi)
 {
@@ -577,11 +664,15 @@ uint8_t CSPI::enc28j60_read_op(uint8_t cmd, uint8_t adr)
 // Generic SPI write command
 void CSPI::enc28j60_write_op(uint8_t cmd, uint8_t adr, uint8_t data)
 {
+   uint8_t dataT = cmd | (adr & ENC28J60_ADDR_MASK);
 	this->onSetSelect();
 	//delay_us(3);
-	enc28j60_tx(cmd | (adr & ENC28J60_ADDR_MASK));
-	enc28j60_tx(data);
-   //delay_us(1);
+	//enc28j60_tx(cmd | (adr & ENC28J60_ADDR_MASK));
+   HAL_SPI_Transmit(&hspi3, &dataT, 1, 1);
+	//enc28j60_tx(data);
+   dataT = data;
+   HAL_SPI_Transmit(&hspi3, &dataT, 1, 1);
+   delay_us(1);
 	this->onClrSelect();
 }
 
@@ -626,26 +717,26 @@ void CSPI::enc28j60_clrRxPackCount(void)
 
 uint16_t CSPI::ENC28J60_GetReceivedPacketLength()
 {
-    uint8_t header[6];  // Для зчитування службової інформації
+    uint8_t header[6];  //
     uint16_t packetLength = 0;
 
-    // Активуємо ENC28J60 (NSS = LOW)
+    //  ENC28J60 (NSS = LOW)
    this->onSetSelect();
 
-    // Команда READ BUFFER MEMORY (0x3A)
+    //  READ BUFFER MEMORY (0x3A)
     uint8_t command = 0x3A;
     HAL_SPI_Transmit(&hspi3, &command, 1, 1);
 
-    // Зчитуємо перші 6 байт службової інформації
+    //
     HAL_SPI_Receive(&hspi3, header, 6, 3);
 
-    // Деактивуємо ENC28J60 (NSS = HIGH)
+    //  ENC28J60 (NSS = HIGH)
     this->onClrSelect();
 
-    // Байти 2 і 3 містять довжину пакета
+    //
     packetLength = (header[2] | (header[3] << 8));
 
-    // Віднімаємо 4 байти CRC (додається ENC28J60 до кожного пакета)
+    //
     if (packetLength > 4)
         packetLength -= 4;
 
@@ -730,7 +821,19 @@ void CSPI::enc28j60_prnt16(uint8_t adr)
 
 void CSPI::enc28j60_decrCounter(void)
 {
-   enc28j60_bfs(ECON2, ECON2_PKTDEC);
+//   enc28j60_set_bank(ECON2);
+//   enc28j60_bfs(ECON2, ECON2_PKTDEC);
+
+   uint8_t data1 = 0;
+   enc28j60_set_bank(ECON2);
+   delay_us(1);
+   this->onSetSelect();
+   data1 = (ENC28J60_SPI_BFS | (ECON2 & ENC28J60_ADDR_MASK));
+   HAL_SPI_Transmit(&hspi3, &data1, 1, 1);
+   data1 = ECON2_PKTDEC;
+   HAL_SPI_Transmit(&hspi3, &data1, 1, 1);
+   delay_us(1);
+   this->onClrSelect();
 }
 
 // Write register
@@ -804,7 +907,7 @@ void CSPI::enc28j60_write_phy(uint8_t adr, uint16_t data)
 }
 
 // Initiate software reset
-static uint16_t gNextPacketPtr = ENC28J60_RXSTART;
+
 void CSPI::enc28j60_soft_reset()
 {
    uint32_t i = 0;
@@ -816,7 +919,7 @@ void CSPI::enc28j60_soft_reset()
 //   delay_us(10000);
 
    //this->onSetSelect();
-//   delay_us(20000);         //Ожидание окончания инициализации ENC28J60
+//   delay_us(20000);         //
 //   this->onSetReset();
 //   delay_us(50000);
 //   this->onClrReset();
@@ -929,11 +1032,14 @@ uint8_t* dPtr = 0;
 
 bool CSPI::enc28j60_recv_packet(uint8_t *buf, uint16_t *buflen, bool &next)
 {
+   /**
+
+   */
    static bool unreleasedPacket = false;
    static bool lostPacket = false;
    uint8_t data1 = 0;
 
-   if(unreleasedPacket)
+   if(false) ///unreleasedPacket) *************************************************
    {
       if(gNextPacketPtr == 0)   //(gNextPacketPtr == ENC28J60_RXSTART)
       {
@@ -948,7 +1054,7 @@ bool CSPI::enc28j60_recv_packet(uint8_t *buf, uint16_t *buflen, bool &next)
       unreleasedPacket = false;
    };
 
-   if((enc28j60_rcr(EPKTCNT) > 0) || (lostPacket == true))
+   if(false) ///((enc28j60_rcr(EPKTCNT) > 0) || (lostPacket == true)) *************
    {
       enc28j60_wcr(ERDPTL, (gNextPacketPtr));         // Buffer read pointer L
       enc28j60_wcr(ERDPTH, (gNextPacketPtr>>8));      // Buffer read pointer H
@@ -1004,7 +1110,7 @@ bool CSPI::enc28j60_recv_packet(uint8_t *buf, uint16_t *buflen, bool &next)
 }
 
 
-// Callback після отримання статус-слова
+// Callback
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 {
    if (hspi->Instance == SPI3)
@@ -1014,13 +1120,21 @@ void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
    };
 }
 
-// Callback після отримання пакета
+// Callback
 void HAL_SPI_RxCpltCallback2(SPI_HandleTypeDef *hspi)
 {
    if (hspi->Instance == SPI3)
    {
       printf("DMA RxCpltCallback 2\n");
    };
+}
+
+void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+    if (hspi->Instance == SPI3)
+    {
+       pEthernet->m_pLanA->onDmaComplete();
+    };
 }
 
 //uint8_t rxDR[1600];

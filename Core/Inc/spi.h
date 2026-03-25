@@ -473,6 +473,14 @@ static const uint16_t RX_BUFFER_SIZE    = ENC28J60_RXEND - ENC28J60_RXSTART + 1;
 
 #define RX_BUFF_SZ         6000
 
+struct SpiTransaction 
+{
+    uint8_t* tx;
+    uint8_t* rx;
+    uint16_t len;
+    void (*callback)(void*);
+    void* ctx;
+};
 
 class CSPI
 {
@@ -481,6 +489,11 @@ public:
    ~CSPI();
 
    uint8_t *m_mac;
+   
+   //void init(SPI_HandleTypeDef* hspi);
+   bool enqueue(SpiTransaction& t);
+   void onDmaComplete();
+   void watchdog(uint32_t now);
 
    void onInitSPI(char spi);
    void onSetSelect(void);
@@ -517,11 +530,21 @@ public:
 
    uint16_t m_nextReadPtr;
    uint8_t m_enc28j60_current_bank;
+   
+   void startRX();
 
 protected:
 
 private:
-//   char m_SpiNumb;
+    static const uint8_t SIZE = 8;
+    SPI_HandleTypeDef* _hspi;
+    SpiTransaction queuer[SIZE];
+    volatile uint8_t head = 0;
+    volatile uint8_t tail = 0;
+    SpiTransaction current;
+    volatile bool busy = false;
+    uint32_t startTime = 0;
+    uint16_t lastRDPTR;
 
 };
 
@@ -572,6 +595,10 @@ void onSetIRQ_DMA_SPI3(void);
 void delay_us(uint32_t us);
 void initAddrLAN(void);
 void onRestartInitEthernet(void);
+void mainRunTime();
+void mainTickRunTime();
+void setFlgDMA_LAN_RX(bool flg);
+void HandleLanSockets(uint8_t *data, uint16_t len);
 
 #endif /* __SPI_H__ */
 
