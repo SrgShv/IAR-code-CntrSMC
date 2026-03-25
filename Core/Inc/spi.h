@@ -575,7 +575,7 @@ public:
    bool onRecieve(uint8_t *data, uint16_t* pLen);
 //   bool onRecieveDMA(uint8_t *data, uint16_t* pLen);
    void onClearIrqFlagsLAN(void);
-   void onRunTime(void);
+//   void onRunTime(void);
    void onTickRunTime(void);
 
 protected:

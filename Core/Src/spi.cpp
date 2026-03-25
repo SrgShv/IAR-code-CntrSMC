@@ -315,12 +315,7 @@ for(uint8_t i=0; i<10; i++)
 
 void CEthernet::onTickRunTime(void)
 {
-   this->m_pLanA->enc28j60_set_bank(EIR);
-   this->m_pLanA->enc28j60_read_op(ENC28J60_SPI_RCR, EIR);
-   if(this->m_pLanA->enc28j60_rcr(EPKTCNT) > 0)
-   {
-      pEthernet->m_pLanA->startRX();
-   };
+   pEthernet->m_pLanA->startRX();
 
 //   switch(stepLan_2)    /** - **/
 //   {
@@ -551,10 +546,12 @@ CSPI::~CSPI()
 
 void CSPI::startRX()
 {
+   if(busy == true) return;
    enc28j60_set_bank(EIR);
    enc28j60_read_op(ENC28J60_SPI_RCR, EIR);
    if(enc28j60_rcr(EPKTCNT) > 0)
    {
+      busy = true;
       if(gNextPacketPtr == 0)
       {
          enc28j60_wcr(ERXRDPTL, (uint8_t)(ENC28J60_RXEND));
@@ -565,17 +562,14 @@ void CSPI::startRX()
          enc28j60_wcr(ERXRDPTL, (uint8_t)(gNextPacketPtr-1));
          enc28j60_wcr(ERXRDPTH, (uint8_t)((gNextPacketPtr-1)>>8));
       };
-
       enc28j60_wcr(ERDPTL, (gNextPacketPtr));         // Buffer read pointer L
       enc28j60_wcr(ERDPTH, (gNextPacketPtr>>8));      // Buffer read pointer H
-
       pBuffTxLAN->onGetWriteBuff(m_dPtrTx);
       m_dPtrTx.data[0] = ENC28J60_SPI_RBM;            // init Tx data
       m_dPtrTx.byteCount[0] = gm_max_sz_Eth;
       pBuffTxLAN->onGetReadBuff(m_dPtrTx);
       pBuffRxLAN->onGetWriteBuff(m_dPtrRx);
       m_dPtrRx.byteCount[0] = gm_max_sz_Eth;
-      busy = true;
       onSetSelect();
       HAL_SPI_TransmitReceive_DMA(&hspi3, m_dPtrTx.data, m_dPtrRx.data, gm_max_sz_Eth);
    };
