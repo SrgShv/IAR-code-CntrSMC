@@ -1134,8 +1134,8 @@ void WriteEEPROM(uint8_t *data, uint16_t len)
 /*****************************************************************************/
 void initAddrLAN(void)     // Read from EEPROM settings for init device
 {
-   
-   
+
+
    if(pFlashM->onCheckWritten())
    {
       //printf("init address from EEPROM\n");
@@ -1326,14 +1326,14 @@ void main(void)
 //         **/
 //      };
 
-      if(IrqFlgRX)
-      {
-         setOnIRQ(false);
-         IrqFlgRX = false;
-         setOnIRQ(true);
-         pEthernet->onRunTime();
-      };
-      
+//      if(IrqFlgRX)
+//      {
+//         setOnIRQ(false);
+//         IrqFlgRX = false;
+//         setOnIRQ(true);
+//         pEthernet->onRunTime();
+//      };
+
 //      if(RxFlgLAN_DMA)
 //      {
 //         RxFlgLAN_DMA = false;
@@ -1361,7 +1361,7 @@ void main(void)
          ParseModbusRX(rxPackBuff, rxPackLen);
          cntErrUSART = 0;
       };
-      
+
       mainRunTime();
 
 //      if(onGetIRQ_DMA_SPI3())

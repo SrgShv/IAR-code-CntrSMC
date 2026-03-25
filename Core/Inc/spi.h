@@ -473,7 +473,7 @@ static const uint16_t RX_BUFFER_SIZE    = ENC28J60_RXEND - ENC28J60_RXSTART + 1;
 
 #define RX_BUFF_SZ         6000
 
-struct SpiTransaction 
+struct SpiTransaction
 {
     uint8_t* tx;
     uint8_t* rx;
@@ -489,9 +489,7 @@ public:
    ~CSPI();
 
    uint8_t *m_mac;
-   
-   //void init(SPI_HandleTypeDef* hspi);
-   bool enqueue(SpiTransaction& t);
+
    void onDmaComplete();
    void watchdog(uint32_t now);
 
@@ -530,7 +528,7 @@ public:
 
    uint16_t m_nextReadPtr;
    uint8_t m_enc28j60_current_bank;
-   
+
    void startRX();
 
 protected:
