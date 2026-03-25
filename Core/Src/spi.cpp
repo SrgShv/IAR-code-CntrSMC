@@ -99,19 +99,40 @@ void setStep(uint8_t stepNo, uint8_t pos)
    };
 }
 
+/** After IRQ DMA TxRx complete => **/
 void mainRunTime()
 {
+   uint8_t data1 = 0;
    if(RxFlgLAN)
    {
+      printf("LAN DMA RX <-\n");
       __disable_irq();
       RxFlgLAN = false;
       __enable_irq();
-      printf("LAN DMA RX <-\n");
+
+      pEthernet->m_pLanA->enc28j60_set_bank(ECON2);
+      pEthernet->m_pLanA->onSetSelect();
+      data1 = (ENC28J60_SPI_BFS | (ECON2 & ENC28J60_ADDR_MASK));
+      HAL_SPI_Transmit(&hspi3, &data1, 1, 1);
+      data1 = ECON2_PKTDEC;
+      HAL_SPI_Transmit(&hspi3, &data1, 1, 1);
+      delay_us(1);
+      pEthernet->m_pLanA->onClrSelect();
+
+      uint8_t *pDat = 0;
+      uint16_t *pLen = 0;
+      uint16_t *pNext = 0;
       if(pBuffRxLAN->onCheck())
       {
          if(pBuffRxLAN->onGetReadBuff(m_dPtr))
          {
-            HandleLanSockets(m_dPtr.data, *(m_dPtr.byteCount));
+            pNext = (uint16_t *)(&m_dPtr.data[1]);
+            gNextPacketPtr = *pNext;
+            pDat = (uint8_t *)(&m_dPtr.data[7]);
+            pLen = (uint16_t *)(&m_dPtr.data[3]);
+            HandleLanSockets(pDat, (*pLen - 4));
+
+            printf("\n NextPtr = %d, Len = %d\n\r", (int)gNextPacketPtr, (int)(*pLen - 4));
          };
       };
    };
@@ -299,6 +320,14 @@ void CEthernet::onRunTime(void)
 
 void CEthernet::onTickRunTime(void)
 {
+   this->m_pLanA->enc28j60_set_bank(EIR);
+   uint8_t fres = this->m_pLanA->enc28j60_read_op(ENC28J60_SPI_RCR, EIR);
+   if(this->m_pLanA->enc28j60_rcr(EPKTCNT) > 0)
+   {
+      printf("<====+++++RX\n\r");
+      pEthernet->m_pLanA->startRX();
+   };
+
    switch(stepLan_2)    /** - **/
    {
       case 1:
@@ -545,27 +574,39 @@ bool CSPI::enqueue(SpiTransaction& t)
 
 void CSPI::startRX()
 {
-   printf("StartRX DMA LAN\n\r");
-//    if (busy || head == tail) return;
-//
-//    current = queuer[tail];
-//    tail = (tail + 1) % SIZE;
-//   enc28j60_wcr(ERDPTL, (0));           // Buffer read pointer L
-//   enc28j60_wcr(ERDPTH, (0));           // Buffer read pointer H
+   enc28j60_set_bank(EIR);
+   uint8_t fres = enc28j60_read_op(ENC28J60_SPI_RCR, EIR);
+   if(enc28j60_rcr(EPKTCNT) > 0)
+   {
+      printf("StartRX DMA LAN\n\r");
+      if(gNextPacketPtr == 0)
+      {
+         enc28j60_wcr(ERXRDPTL, (uint8_t)(ENC28J60_RXEND));
+         enc28j60_wcr(ERXRDPTH, (uint8_t)((ENC28J60_RXEND)>>8));
+      }
+      else
+      {
+         enc28j60_wcr(ERXRDPTL, (uint8_t)(gNextPacketPtr-1));
+         enc28j60_wcr(ERXRDPTH, (uint8_t)((gNextPacketPtr-1)>>8));
+      };
 
-   pBuffTxLAN->onGetWriteBuff(m_dPtrTx);
-   m_dPtrTx.data[0] = ENC28J60_SPI_RBM;      // init Tx data
-   m_dPtrTx.byteCount[0] = gm_max_sz_Eth;
-   pBuffTxLAN->onGetReadBuff(m_dPtrTx);
-   pBuffRxLAN->onGetWriteBuff(m_dPtrRx);
-   m_dPtrRx.byteCount[0] = gm_max_sz_Eth;
-   busy = true;
-   //uint8_t *tPP = &m_dPtrRx.data[0];
-   //startTime = HAL_GetTick();
-   onSetSelect();
-   //HAL_SPI_TransmitReceive_DMA(&hspi3, m_dPtrTx.data, tPP, gm_max_sz_Eth);
-   HAL_SPI_TransmitReceive_DMA(&hspi3, m_dPtrTx.data, m_dPtrRx.data, gm_max_sz_Eth);
-   //HAL_SPI_TransmitReceive_DMA(&hspi3, m_dPtrTx.data, m_dPtrRx.data, 7);
+      enc28j60_wcr(ERDPTL, (gNextPacketPtr));         // Buffer read pointer L
+      enc28j60_wcr(ERDPTH, (gNextPacketPtr>>8));      // Buffer read pointer H
+
+      printf("\n a) NextPtr = %d\n\r", (int)gNextPacketPtr);
+
+      pBuffTxLAN->onGetWriteBuff(m_dPtrTx);
+      m_dPtrTx.data[0] = ENC28J60_SPI_RBM;      // init Tx data
+      m_dPtrTx.byteCount[0] = gm_max_sz_Eth;
+      pBuffTxLAN->onGetReadBuff(m_dPtrTx);
+      pBuffRxLAN->onGetWriteBuff(m_dPtrRx);
+      m_dPtrRx.byteCount[0] = gm_max_sz_Eth;
+      busy = true;
+      //uint8_t *tPP = &m_dPtrRx.data[0];
+      //startTime = HAL_GetTick();
+      onSetSelect();
+      HAL_SPI_TransmitReceive_DMA(&hspi3, m_dPtrTx.data, m_dPtrRx.data, gm_max_sz_Eth);
+   };
 }
 
 /**
@@ -585,13 +626,12 @@ m_dPtrRx.data:
 
 void CSPI::onDmaComplete()
 {
+   uint8_t data1 = 0;
    busy = false;
    RxFlgLAN = true;
-   //setFlgDMA_LAN_RX(true);
    onClrSelect();
    printf("CallbackDMA_LAN\n\r");
-//   enc28j60_wcr(ERDPTL, (lastRDPTR)&0xFF);
-//   enc28j60_wcr(ERDPTH, (lastRDPTR)>>8);
+
 }
 
 void CSPI::watchdog(uint32_t now)
@@ -1033,7 +1073,8 @@ uint8_t* dPtr = 0;
 bool CSPI::enc28j60_recv_packet(uint8_t *buf, uint16_t *buflen, bool &next)
 {
    /**
-
+   gNextPacketPtr, ERXRDPT - ptr to dataPackNumber 1,2,3...
+   ERDPT - ptr to memory address pos
    */
    static bool unreleasedPacket = false;
    static bool lostPacket = false;
