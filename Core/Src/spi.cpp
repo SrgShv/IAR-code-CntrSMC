@@ -121,13 +121,15 @@ void mainRunTime()
 
       uint8_t *pDat = 0;
       uint16_t *pLen = 0;
-      uint16_t *pNext = 0;
+      //uint16_t *pNext = 0;
       if(pBuffRxLAN->onCheck())
       {
          if(pBuffRxLAN->onGetReadBuff(m_dPtr))
          {
-            pNext = (uint16_t *)(&m_dPtr.data[1]);
-            gNextPacketPtr = *pNext;
+            //pNext = (uint16_t *)(&m_dPtr.data[1]);
+            //gNextPacketPtr = *pNext;
+            //pNext = (uint16_t *)(&m_dPtr.data[1]);
+            gNextPacketPtr = *(uint16_t *)(&m_dPtr.data[1]);
             pDat = (uint8_t *)(&m_dPtr.data[7]);
             pLen = (uint16_t *)(&m_dPtr.data[3]);
             HandleLanSockets(pDat, (*pLen - 4));
@@ -372,15 +374,15 @@ bool CEthernet::onRecieve(uint8_t *data, uint16_t* pLen)
    return false;
 }
 
-bool CEthernet::onRecieveDMA(uint8_t *data, uint16_t* pLen)
-{
-   //bool res = false;
-   uint16_t len = m_pLanA->onRecieve(data);
-   if(len > ENC28J60_MAXFRAME) len = ENC28J60_MAXFRAME;
-   *pLen = len;
-   if(len > 0) return true;
-   return false;
-}
+//bool CEthernet::onRecieveDMA(uint8_t *data, uint16_t* pLen)
+//{
+//   //bool res = false;
+//   uint16_t len = m_pLanA->onRecieve(data);
+//   if(len > ENC28J60_MAXFRAME) len = ENC28J60_MAXFRAME;
+//   *pLen = len;
+//   if(len > 0) return true;
+//   return false;
+//}
 
 
 
@@ -542,7 +544,7 @@ uint16_t CLAN::onRecieve(uint8_t *data)
 }
 //*************************************CLAN******************************
 
-
+//*************************************CSPI******************************
 CSPI::CSPI() :
    m_mac(0),
    m_nextReadPtr(0),
@@ -555,19 +557,12 @@ CSPI::~CSPI()
 {
 }
 
-//*************************************CSPI******************************
-//void CSPI::init(SPI_HandleTypeDef* hspi)
-//{
-//    _hspi = hspi;
-//}
-
-
 void CSPI::startRX()
 {
    enc28j60_set_bank(EIR);
    enc28j60_read_op(ENC28J60_SPI_RCR, EIR);
    if(enc28j60_rcr(EPKTCNT) > 0)
-   {;
+   {
       if(gNextPacketPtr == 0)
       {
          enc28j60_wcr(ERXRDPTL, (uint8_t)(ENC28J60_RXEND));
@@ -583,7 +578,7 @@ void CSPI::startRX()
       enc28j60_wcr(ERDPTH, (gNextPacketPtr>>8));      // Buffer read pointer H
 
       pBuffTxLAN->onGetWriteBuff(m_dPtrTx);
-      m_dPtrTx.data[0] = ENC28J60_SPI_RBM;      // init Tx data
+      m_dPtrTx.data[0] = ENC28J60_SPI_RBM;            // init Tx data
       m_dPtrTx.byteCount[0] = gm_max_sz_Eth;
       pBuffTxLAN->onGetReadBuff(m_dPtrTx);
       pBuffRxLAN->onGetWriteBuff(m_dPtrRx);
@@ -611,22 +606,19 @@ m_dPtrRx.data:
 
 void CSPI::onDmaComplete()
 {
-   uint8_t data1 = 0;
    busy = false;
    RxFlgLAN = true;
    onClrSelect();
-   //printf("CallbackDMA_LAN\n\r");
-
 }
 
 void CSPI::watchdog(uint32_t now)
 {
-    if (busy && (now - startTime > 5))
-    {
-        __HAL_SPI_DISABLE(_hspi);
-        __HAL_SPI_ENABLE(_hspi);
-        busy = false;
-    }
+   if (busy && (now - startTime > 5))
+   {
+      __HAL_SPI_DISABLE(_hspi);
+      __HAL_SPI_ENABLE(_hspi);
+      busy = false;
+   };
 }
 
 //*************************************----******************************

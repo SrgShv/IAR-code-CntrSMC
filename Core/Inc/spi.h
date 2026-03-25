@@ -573,7 +573,7 @@ public:
    void onRestart(uint8_t *MAC);
    bool onSend(uint8_t *data, uint16_t len);
    bool onRecieve(uint8_t *data, uint16_t* pLen);
-   bool onRecieveDMA(uint8_t *data, uint16_t* pLen);
+//   bool onRecieveDMA(uint8_t *data, uint16_t* pLen);
    void onClearIrqFlagsLAN(void);
    void onRunTime(void);
    void onTickRunTime(void);
