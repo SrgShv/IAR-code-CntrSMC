@@ -512,10 +512,10 @@ public:
    uint16_t enc28j60_read_phy(uint8_t adr);
    void enc28j60_bfs(uint8_t adr, uint8_t mask);
    void enc28j60_bfc(uint8_t adr, uint8_t mask);
-   void enc28j60_write_buffer(uint8_t *buf, uint16_t len);
+//   void enc28j60_write_buffer(uint8_t *buf, uint16_t len);
    void enc28j60_read_buffer(uint8_t *buf, uint16_t len);
    void enc28j60_send_packet(uint8_t *data, uint16_t len);
-   bool enc28j60_recv_packet(uint8_t *buf, uint16_t *buflen, bool &next);
+//   bool enc28j60_recv_packet(uint8_t *buf, uint16_t *buflen, bool &next);
    //uint16_t enc28j60_recv_packet_DMA(uint8_t *buf, uint16_t *len);
    void enc28j60_soft_reset();
    uint16_t ENC28J60_GetReceivedPacketLength();
@@ -551,16 +551,14 @@ public:
    CLAN();
    void onInit(uint8_t *mac);
    void onSend(uint8_t *data, uint16_t len);
-   uint16_t onRecieve(uint8_t *data);
    void onClearIrqFlags(void);
 
 protected:
 
 private:
-//   char m_SpiNumb;
    uint8_t m_macadr[6];
    char m_MacFlag;
-   uint8_t *m_rxBuff;
+//   uint8_t *m_rxBuff;
 };
 
 class CEthernet
@@ -571,8 +569,6 @@ public:
    void onStartInit(uint8_t *MAC);
    void onRestart(uint8_t *MAC);
    bool onSend(uint8_t *data, uint16_t len);
-   bool onRecieve(uint8_t *data, uint16_t* pLen);
-//   bool onRecieveDMA(uint8_t *data, uint16_t* pLen);
    void onClearIrqFlagsLAN(void);
 //   void onRunTime(void);
    void onTickRunTime(void);
