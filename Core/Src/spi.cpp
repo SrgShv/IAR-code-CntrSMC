@@ -1143,9 +1143,9 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
 
 void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
-   if (hspi == &hspi3)
+   if (hspi->Instance == SPI3)
    {
-      printf("DMA SPI3 TxCpltCallback\n\r");
+      //printf("DMA SPI3 TxCpltCallback\n\r");
       pEthernet->m_pLanA->onClrSelect(); // CS = 1
       pEthernet->m_pLanA->enc28j60_write_op(ENC28J60_SPI_BFS, ECON1, ECON1_TXRTS);
    };
