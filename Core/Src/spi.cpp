@@ -1015,7 +1015,7 @@ void CSPI::enc28j60_send_packet(uint8_t *data, uint16_t len)
    HAL_SPI_Transmit_DMA(&hspi3, data, len);
    /** StartTimer4 (6*0.1msec = 0.5msec) -> onSetSelENC28J60(false),
       -> enc28j60_bfs(ECON1, ECON1_TXRTS) for request packet send   */
-   onStartTimer4(6);
+   //onStartTimer4(6); // 6*0.1 msec = 0.6 msec
 }
 
 void CSPI::onSetReqTX(void)
@@ -1139,6 +1139,16 @@ void HAL_SPI_TxRxCpltCallback(SPI_HandleTypeDef *hspi)
     {
        pEthernet->m_pLanA->onDmaComplete();
     };
+}
+
+void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
+{
+   if (hspi == &hspi3)
+   {
+      printf("DMA SPI3 TxCpltCallback\n\r");
+      pEthernet->m_pLanA->onClrSelect(); // CS = 1
+      pEthernet->m_pLanA->enc28j60_write_op(ENC28J60_SPI_BFS, ECON1, ECON1_TXRTS);
+   };
 }
 
 //uint8_t rxDR[1600];
