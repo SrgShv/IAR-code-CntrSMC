@@ -65,6 +65,7 @@ static volatile uint32_t timeLan_2 = 0;
 static volatile uint32_t timeLan_3 = 0;
 static volatile uint32_t timeLan_4 = 0;
 static volatile bool RxFlgLAN = false;
+static volatile bool TxFlgLAN = false;
 
 //static bool     unreleasedPacket = false;
 
@@ -546,6 +547,7 @@ CSPI::~CSPI()
 
 void CSPI::startRX()
 {
+   if(TxFlgLAN) return;
    if(busy == true) return;
    enc28j60_set_bank(EIR);
    enc28j60_read_op(ENC28J60_SPI_RCR, EIR);
@@ -992,13 +994,14 @@ void CSPI::enc28j60_soft_reset()
 //#define SEND_BUFF_SWITCH
 void CSPI::enc28j60_send_packet(uint8_t *data, uint16_t len)
 {
+   if(RxFlgLAN) return;
    uint8_t prcbyte = 0x0E;
    uint8_t tdata = ENC28J60_SPI_WBM;
+   TxFlgLAN = true;
    enc28j60_bfc(ECON1, ECON1_TXRTS); // Clear packet send
    enc28j60_wcr16(ETXST, ENC28J60_TXSTART);
 	enc28j60_wcr16(ETXND, ENC28J60_TXSTART + len + 6);
 	enc28j60_wcr16(EWRPT, ENC28J60_TXSTART);
-
    enc28j60_bfs(ECON1, ECON1_TXRST);
    enc28j60_bfc(ECON1, ECON1_TXRST);
    enc28j60_bfc(EIR, EIR_TXERIF|EIR_TXIF);
@@ -1013,6 +1016,8 @@ void CSPI::enc28j60_send_packet(uint8_t *data, uint16_t len)
    /** TX SPI PACK - TX SPI PACK - TX SPI PACK - TX SPI PACK      */
    HAL_SPI_Transmit(&hspi3, &tdata, 1, 1);
    HAL_SPI_Transmit_DMA(&hspi3, data, len);
+   /** next wait for HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi) **/
+
    /** StartTimer4 (6*0.1msec = 0.5msec) -> onSetSelENC28J60(false),
       -> enc28j60_bfs(ECON1, ECON1_TXRTS) for request packet send   */
    //onStartTimer4(6); // 6*0.1 msec = 0.6 msec
@@ -1148,6 +1153,7 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
       //printf("DMA SPI3 TxCpltCallback\n\r");
       pEthernet->m_pLanA->onClrSelect(); // CS = 1
       pEthernet->m_pLanA->enc28j60_write_op(ENC28J60_SPI_BFS, ECON1, ECON1_TXRTS);
+      TxFlgLAN = false;
    };
 }
 
