@@ -86,7 +86,8 @@ void CModbus::onReadREG(uint8_t devAddr, uint16_t regPos, uint16_t regCount)
    {
       //pPortMB->onSetRX(len*2+5);
       pPortMB->onSend(m_buffTX, packSZ);
-      pPortMB->onSetRX(len*2+5);
+      //printf("MBR=>\n\r");
+      //pPortMB->onSetRX(len*2+5);
       //printf("send MBR Read reg:\n");
       //showPack(m_buffTX, packSZ);
    };
@@ -109,7 +110,7 @@ void CModbus::onWriteREG(uint8_t devAddr, uint16_t regPos, uint16_t regValue)
    if(c <= m_txBuffSz)
    {
       pPortMB->onSend(m_buffTX, c);
-      pPortMB->onSetRX(8);
+      //pPortMB->onSetRX(8);
    };
 }
 
@@ -137,7 +138,7 @@ void CModbus::onWriteREGW(uint8_t devAddr, uint16_t regPos, uint16_t regCount, u
    if(c <= m_txBuffSz)
    {
       pPortMB->onSend(m_buffTX, c);
-      pPortMB->onSetRX(8);
+      //pPortMB->onSetRX(8);
    };
 }
 

@@ -21,8 +21,9 @@
 #include "usart.h"
 #include "stdio.h"
 
-#define USART_DMA_BFF_LEN     64
+//#define USART_DMA_BFF_LEN     64
 //#define DEBUG_FLASH        /** DEBUG MODE - DEBUG MODE -  DEBUG MODE **/
+volatile bool USART_RXB = false;
 
 UART_HandleTypeDef huart2;
 DMA_HandleTypeDef hdma_usart2_rx;
@@ -90,7 +91,8 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
       hdma_usart2_rx.Init.MemInc = DMA_MINC_ENABLE;
       hdma_usart2_rx.Init.PeriphDataAlignment = DMA_PDATAALIGN_BYTE;
       hdma_usart2_rx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
-      hdma_usart2_rx.Init.Mode = DMA_NORMAL;
+      //hdma_usart2_rx.Init.Mode = DMA_NORMAL;
+      hdma_usart2_rx.Init.Mode = DMA_CIRCULAR;
       hdma_usart2_rx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
       hdma_usart2_rx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
       if (HAL_DMA_Init(&hdma_usart2_rx) != HAL_OK)
@@ -110,7 +112,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
       hdma_usart2_tx.Init.MemDataAlignment = DMA_MDATAALIGN_BYTE;
       hdma_usart2_tx.Init.Mode = DMA_NORMAL;
       //hdma_usart2_tx.Init.Mode = DMA_CIRCULAR;
-      hdma_usart2_tx.Init.Priority = DMA_PRIORITY_VERY_HIGH;
+      hdma_usart2_tx.Init.Priority = DMA_PRIORITY_HIGH;
       hdma_usart2_tx.Init.FIFOMode = DMA_FIFOMODE_DISABLE;
       if (HAL_DMA_Init(&hdma_usart2_tx) != HAL_OK)
       {
@@ -120,20 +122,22 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
       __HAL_LINKDMA(uartHandle,hdmatx,hdma_usart2_tx);
 
       /* USART2 interrupt Init */
-      HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 1, 0);  // RX USART2 DMA
-      HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
+      //HAL_NVIC_SetPriority(DMA1_Stream5_IRQn, 1, 0);  // RX USART2 DMA
+      //HAL_NVIC_EnableIRQ(DMA1_Stream5_IRQn);
       HAL_NVIC_SetPriority(DMA1_Stream6_IRQn, 2, 3);  // TX USART2 DMA
       HAL_NVIC_EnableIRQ(DMA1_Stream6_IRQn);
 
-      __HAL_UART_ENABLE_IT(&huart2, UART_IT_ERR);  // Активує переривання для помилок
-      __HAL_UART_ENABLE_IT(&huart2, UART_IT_RXNE); // Для отримання даних
+      //__HAL_UART_ENABLE_IT(&huart2, UART_IT_ERR);  // Активує переривання для помилок
+      //__HAL_UART_ENABLE_IT(&huart2, UART_IT_RXNE); // Для отримання даних
 
-      __HAL_DMA_ENABLE_IT(&hdma_usart2_rx, DMA_IT_TE);  // Помилка передачі
-      __HAL_DMA_ENABLE_IT(&hdma_usart2_rx, DMA_IT_HT);  // Половинне завершення
-      __HAL_DMA_ENABLE_IT(&hdma_usart2_rx, DMA_IT_TC);  // Завершення передачі
+      //__HAL_DMA_ENABLE_IT(&hdma_usart2_rx, DMA_IT_TE);  // Помилка передачі
+      //__HAL_DMA_ENABLE_IT(&hdma_usart2_rx, DMA_IT_HT);  // Половинне завершення
+      //__HAL_DMA_ENABLE_IT(&hdma_usart2_rx, DMA_IT_TC);  // Завершення передачі
 
-      HAL_NVIC_SetPriority(USART2_IRQn, 2, 1);
+      HAL_NVIC_SetPriority(USART2_IRQn, 1, 3);
       HAL_NVIC_EnableIRQ(USART2_IRQn);
+      
+      __HAL_DMA_ENABLE_IT(&hdma_usart2_rx, DMA_IT_TC);  // Завершення передачі
    }
 }
 
@@ -218,7 +222,9 @@ uint8_t dma_rxb[USART_DMA_BFF_LEN];
 CPortM::CPortM() :
    m_buffTX(0),
    m_buffRX(0),
-   m_RxPackLen(USART_DMA_BFF_LEN/2)
+   m_RxPackLen(USART_DMA_BFF_LEN),
+   lastPos(0),
+   buffSize(USART_DMA_BFF_LEN)
 {
    m_buffTX = dma_txb;
    m_buffRX = dma_rxb;
@@ -352,27 +358,65 @@ void CPortM::onSend(uint8_t *data, uint16_t len)
    {
       m_buffTX[i] = data[i];
    };
-
    setEnableRS485TX(true);
 
 #ifdef DEBUG_FLASH
    uint32_t cnt = computeTxTime(115200, len);
 #else
-    uint32_t cnt = computeTxTime(onGetSpeedRS485(), len);
+    //uint32_t cnt = computeTxTime(onGetSpeedRS485(), len);
 #endif
 
-   setEnableTimerTX(cnt);
-   huart2.gState = HAL_UART_STATE_READY;
+   //setEnableTimerTX(cnt);
+   //huart2.gState = HAL_UART_STATE_READY;
    HAL_UART_Transmit_DMA(&huart2, m_buffTX, len);
+   //__HAL_DMA_ENABLE_IT(&hdma_usart2_rx, DMA_IT_TC);   // Завершення передачі
+}
+
+bool CPortM::onRead(uint8_t *data, uint16_t &len)
+{
+   ///if(HAL_UART_Receive(&huart2, m_buffRX, len, 100) == HAL_OK) return true;
+   ///return false;
+   uint16_t cnt = 0;
+   uint16_t nextPos = buffSize - DMA1_Stream5->NDTR;
+   //printf("NDTR:%d\n", (int)DMA1_Stream5->NDTR);
+   if(nextPos == lastPos) 
+   {
+      len = 0;
+      return false;
+   };
+
+   if(nextPos > lastPos)
+   {
+      cnt = 0;
+      len = nextPos - lastPos;
+      for(int16_t i=lastPos; i<(lastPos+len); i++)
+      {
+         data[cnt++] = m_buffRX[i];
+      };
+      //printf("onRead RS485\n\r");
+      //showPack(data, len);
+      lastPos = nextPos;    
+      return true;
+   };
+   
+   if(nextPos < lastPos)
+   {
+      cnt = 0;
+      len = buffSize + nextPos - lastPos;
+      for(int16_t i=lastPos; i<(lastPos+len); i++)
+      {
+         if(i >= buffSize) i = 0;
+         data[cnt++] = m_buffRX[i];
+      };
+      lastPos = nextPos;
+      return true;
+   };
 }
 
 void CPortM::onSetRX(uint16_t RxPackLen)
-{
-   m_RxPackLen = RxPackLen;
-   if((m_RxPackLen*2) <= USART_DMA_BFF_LEN)
-   {
-      HAL_UART_Receive_DMA(&huart2, m_buffRX, m_RxPackLen);
-   };
+{ 
+   USART2->SR &= ~(0x0001<<5);
+   HAL_UART_Receive_DMA(&huart2, m_buffRX, RxPackLen);
 }
 
 uint16_t CPortM::onGetRxLen(void)
@@ -395,6 +439,15 @@ CByteBuff::~CByteBuff()
    if(m_buffRX != 0) delete [] m_buffRX;
 }
 
+void CByteBuff::onAddData(uint8_t *data, uint16_t len)
+{
+   for(uint16_t i=0; i<len; i++)
+   {
+      m_buffRX[m_len++] = data[i];
+      if(m_len >= m_maxSz) break;
+   };
+}
+
 void CByteBuff::onGetData(uint8_t *data, uint16_t len)
 {
    if(len <= m_maxSz)
@@ -404,6 +457,18 @@ void CByteBuff::onGetData(uint8_t *data, uint16_t len)
       {
          m_buffRX[i] = data[i];
       };
+   };
+}
+
+void CByteBuff::onClear()
+{
+   if(m_len > 0)
+   {
+      for(uint16_t i=0; i<m_len; i++)
+      {
+         m_buffRX[i] = 0;
+      };
+      m_len = 0;
    };
 }
 
@@ -429,7 +494,8 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
    if(huart->Instance == USART2)
    {  /** Modbus RX  */
-      onSetRxFlgUSART(true);
+      USART_RXB = true;
+      //onSetRxFlgUSART(true);
       printf("RX:\n");
       //pBuffMB->onGetData(pBuffRX_MA, rxLen);
    };
@@ -446,8 +512,7 @@ void HAL_UART_TxCpltCallback(UART_HandleTypeDef *huart)
 {
    if(huart->Instance == USART2)
    {
-      //printf("txtx\n");
-      //HAL_UART_DMAStop(&huart2);
+      setEnableTimerTX(4);
    };
 }
 

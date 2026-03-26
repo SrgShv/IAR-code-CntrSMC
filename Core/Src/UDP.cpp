@@ -294,6 +294,7 @@ char CArp::onCheckArpA(uint8_t *data, uint16_t len)                     // MAIN 
 
    if((pPack->dMAC.type[0] == 0x08) && (pPack->dMAC.type[1] == 0x06))   /** if ARP PACK */
    {
+      //assert_failed((uint8_t *)__FILE__, __LINE__);
       if(pPack->opcode[1] == 0x01)           /// if opcode request
       {
          if(reverseDWORD(pPack->targIP) == GetDeviceIP())
@@ -312,6 +313,7 @@ char CArp::onCheckArpA(uint8_t *data, uint16_t len)                     // MAIN 
       }
       else if(pPack->opcode[1] == 0x02)      /// if opcode is response 2
       {
+         //assert_failed((uint8_t *)__FILE__, __LINE__);
          res = 2;
          uint8_t *pDMAC = GetDeviceMAC();
          for(uint16_t i=0; i<6; i++)
@@ -330,6 +332,7 @@ char CArp::onCheckArpA(uint8_t *data, uint16_t len)                     // MAIN 
                servUDB.serverMAC[4] = pPack->sendMAC[4];
                servUDB.serverMAC[5] = pPack->sendMAC[5];
                SetFlgARP(true);
+               //assert_failed((uint8_t *)__FILE__, __LINE__);
             };
          };
       }

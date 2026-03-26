@@ -107,6 +107,7 @@ CTimeOut mTimeOutRELAY;
 CTimeOut mTimeOutLEDG;
 CTimeOut mTimeOutMBR;
 CTimeOut mTimeOutUID;
+CTimeOut mTimeEnRS485;
 //CTimeOut mTimeOutPING;
 //CTimeOut mTimeOutSARP;
 //CTimeOut mTimeActiveRX;
@@ -116,6 +117,7 @@ CTimeOut *pTimeOutRELAY = &mTimeOutRELAY;
 CTimeOut *pTimeOutLEDG = &mTimeOutLEDG;
 CTimeOut *pTimeOutMBR = &mTimeOutMBR;
 CTimeOut *pTimeOutUID = &mTimeOutUID;
+CTimeOut *pTimeEnRS485 = &mTimeEnRS485;
 //CTimeOut *pTimeOutPING = &mTimeOutPING;
 //CTimeOut *pTimeOutSARP = &mTimeOutSARP;
 //CTimeOut *pTimeActiveRX = &mTimeActiveRX;
@@ -143,7 +145,7 @@ sServerUDB servUDB;
 static volatile bool flagBlinkRedLED = false;
 static volatile bool flagBlinkGreenLED = false;
 
-static volatile bool txFlgLAN1 = false;
+//static volatile bool txFlgLAN1 = false;
 static volatile bool txFlgLAN2 = false;
 static volatile bool txFlgLAN3 = false;
 
@@ -163,8 +165,8 @@ static volatile bool respFlgReqUID = false;
 static volatile bool RxFlgLAN_DMA = false;
 
 static volatile uint8_t gFlagARP_A = 0;
-uint8_t EthBuffRXA[RX_BUFF_SZ];
-uint16_t EthBffLenA = 0;
+//uint8_t EthBuffRXA[RX_BUFF_SZ];
+//uint16_t EthBffLenA = 0;
 
 uint8_t deviceMAC[6];
 uint32_t servIPA = 0;
@@ -201,6 +203,7 @@ void tickTIMER(void)
       pTimeOutMBR->onTick();
       pTimeOutLEDG->onTick();
       pTimeOutRELAY->onTick();
+      pTimeEnRS485->onTick();
    };
 }
 /*****************************************************************************/
@@ -306,6 +309,7 @@ void ParseModbusRX(uint8_t *data, uint16_t len)    // USART - RS485 RX: Modbus
          for check card UID in Data Base */
          if(cardType == 0x04)
          {
+           //assert_failed((uint8_t *)__FILE__, __LINE__);
             makeRqDB(pTxUID, cardType, data[0]);
 #ifdef   DEBUG_PRINT_MBR
             printf("UID: %02X%02X%02X%02X\n\r", (int)data[5], (int)data[6], (int)data[7], (int)data[8]);
@@ -313,12 +317,14 @@ void ParseModbusRX(uint8_t *data, uint16_t len)    // USART - RS485 RX: Modbus
          }
          else if(cardType == 0x07)
          {
+           //assert_failed((uint8_t *)__FILE__, __LINE__);
             makeRqDB(pTxUID, cardType, data[0]);
 #ifdef   DEBUG_PRINT_MBR
             printf("UID: %02X%02X%02X%02X%02X%02X%02X\n\r", (int)data[5], (int)data[6],
                   (int)data[7], (int)data[8], (int)data[9], (int)data[10], (int)data[11]);
 #endif
          };
+         //assert_failed((uint8_t *)__FILE__, __LINE__);
       }
       else if(data[1] == 0x06)
       {
@@ -394,7 +400,7 @@ void EthernetSend(uint8_t *data, uint16_t len)
 /*****************************************************************************/
 /**   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   **/
 /*****************************************************************************/
-static bool nextFlgRX = false;
+//static bool nextFlgRX = false;
 volatile static bool IrqFlgRX = false;
 void handleRxIrqLanA(void)
 {
@@ -587,7 +593,7 @@ void HandleLanSockets(uint8_t *data, uint16_t len)
 /**  Handle RX from LAN: select ARP or DHCP or ICMP or UDP-data **/
    bool check = true;
    uint8_t *pMAC = (uint8_t *)data;
-   showPack(data, len);
+   //showPack(data, len);
    /** Check and Handle ARP, DHCP, ICMP, UDP */
    if(0 == pArp->onCheckArpA(data, len))
    {                                                       /** RX pack - NOT ARP */
@@ -1258,6 +1264,12 @@ void onSetRxFlgUSART(bool flg)   /** ------  call from USART RX IRQ  ------ **/
 //#define   DEBUG_PRINT_0
 //#define   DEBUG_PRINT
 /*****************************************************************************/
+uint8_t MBRrx[USART_DMA_BFF_LEN];
+//uint8_t* MBRrx = NULL;
+uint16_t MBRlen = 0;
+uint8_t rxBuffMBR[USART_DMA_BFF_LEN];
+uint16_t rxLenBuffMBR = 0;
+uint16_t rxLenMBR = 0;
 /***** MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN ******/
 /***** MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN MAIN ******/
 void main(void)
@@ -1282,7 +1294,8 @@ void main(void)
    SetFlagServerUBD(false);
    step_ARP = 1; // start ARP loop
    countTimeControl = 0;
-   pPortMB->onClearFlgRX();
+   //pPortMB->onClearFlgRX();
+   pPortMB->onSetRX(USART_DMA_BFF_LEN);
    initFlag = true;
 
 #ifdef WDOG_ON
@@ -1302,81 +1315,36 @@ void main(void)
       };
 
       /** STATUS CONTROL                                     */
-//      if(GPIO_PIN_RESET == HAL_GPIO_ReadPin(GPIOD,GPIO_PIN_2))
-//      {
-//         setStep(1, 1);
-//      };
-//      if(count_IRQ_LAN > 0)
-//      {
-//         --count_IRQ_LAN;
-//         //setStep(1, 1);
-//         /**
-//         nextFlgRX = true;
-//         for(uint8_t i=0; i<10; i++)
-//         {
-//            if(nextFlgRX)
-//            {
-//               if(pBuffLAN->onGetWriteBuff(m_dPtr))
-//               {
-//                  pEthernet->m_pLanA->enc28j60_recv_packet(m_dPtr.data, m_dPtr.byteCount, nextFlgRX);
-//               };
-//            }
-//            else break;
-//         };
-//         **/
-//      };
-
-//      if(IrqFlgRX)
-//      {
-//         setOnIRQ(false);
-//         IrqFlgRX = false;
-//         setOnIRQ(true);
-//         pEthernet->onRunTime();
-//      };
-
-//      if(RxFlgLAN_DMA)
-//      {
-//         RxFlgLAN_DMA = false;
-//         printf("LAN DMA RX <-\n");
-//         if(pBuffRxLAN->onCheck())
-//         {
-//            if(pBuffRxLAN->onGetReadBuff(m_dPtr)) HandleLanSockets(m_dPtr.data, *(m_dPtr.byteCount));
-//         };
-//      };
       mainRunTime();
-
-      if(RxFlgUSART)
+      
+      while(pPortMB->onRead(MBRrx, MBRlen))
       {
-         printf("USART RX ->\n");
-         /** RS485 - Modbus RX  */
-         RxFlgUSART = false;
-         rxPackLen = pPortMB->onGetRxLen();
-         for(uint8_t n=0; n<rxPackLen; n++)
+         if(MBRlen > 0)
          {
-            rxPackBuff[n] = pBuffRX_MA[n];
+            //printf("pack from MBR-USART-RS485\n\r");
+            //showPack(MBRrx, MBRlen);
+            pBuffMB->onAddData(MBRrx, MBRlen);
+            pTimeEnRS485->onStart(2, 2);
          };
-
-         /** flag ARP               flag DHCP              flag PING **/
-         if((txFlgLAN1 == true) && (txFlgLAN2 == true) && (txFlgLAN3 == true)) SetFlagServerUBD(true);
-         else SetFlagServerUBD(false);
-         ParseModbusRX(rxPackBuff, rxPackLen);
-         cntErrUSART = 0;
+      };
+      
+      /**
+         timeout pause of the end serial RX
+      */
+      if(pTimeEnRS485->onIsTimeOut())
+      {
+         if(pBuffMB->onCheck())
+         {
+            pBuffMB->onCopyRX(rxBuffMBR, rxLenBuffMBR);
+         };
+         pTimeEnRS485->onStop();
+         ParseModbusRX(rxBuffMBR, rxLenBuffMBR);
+         pBuffMB->onClear();
       };
 
-
-
-//      if(onGetIRQ_DMA_SPI3())
-//      {
-//         qflg = false;
-//         if(pBuffLAN->onGetReadBuff(m_dPtr)) HandleLanSockets(m_dPtr.data, *(m_dPtr.byteCount));
-//      };
-
-//      if(pBuffRxLAN->onCheck())
-//      {
-//         if(pBuffRxLAN->onGetReadBuff(m_dPtrRx)) HandleLanSockets(m_dPtrRx.data, *(m_dPtrRx.byteCount));
-//      };
-
-      /** Start UDP request to UBD server over Ethernet LAN **/
+      /** 
+         Start UDP request to UBD server over Ethernet LAN 
+      */
       if(GetFlagServerUBD())
       {
          if(makeFlgReqUID)
@@ -1562,7 +1530,8 @@ void onHandleARP(void)
       if(flagStateARP)
       {
          arpCnt = 0;
-         txFlgLAN1 = true;
+         SetFlagServerUBD(true);
+         //txFlgLAN1 = true;
          ++step_ARP;
          timeout_1 = 0;
          step_DHCP = 1;
@@ -1782,7 +1751,7 @@ static volatile uint32_t err_count = 0;
             {
                step_UDP = 2;
                timeout_4 = 0;
-               printf("!!! === timeout response UDP === !!!\r\n");
+               //printf("!!! === timeout response UDP === !!!\r\n");
                if(++err_count > 3)  SystemResetD((char *)__FILE__, __LINE__);
             };
          };

@@ -79,9 +79,9 @@ void MX_TIM3_Init(void)
 
    /* USER CODE END TIM3_Init 1 */
    htim3.Instance = TIM3;
-   htim3.Init.Prescaler = 83;
+   htim3.Init.Prescaler = 83;    // (84 MHz / (83 + 1) = 1 MHz)
    htim3.Init.CounterMode = TIM_COUNTERMODE_UP;
-   htim3.Init.Period = MBTX_TIME;
+   htim3.Init.Period = 99;   //(1 MHz / (99 + 1) = 10 kHz => 0.1 msec)
    //htim3.Init.Period = 1200;
    htim3.Init.ClockDivision = TIM_CLOCKDIVISION_DIV1;
    htim3.Init.AutoReloadPreload = TIM_AUTORELOAD_PRELOAD_DISABLE;

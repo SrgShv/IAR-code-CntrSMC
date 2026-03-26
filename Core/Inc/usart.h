@@ -21,7 +21,8 @@
 #ifndef __USART_H__
 #define __USART_H__
 
-#define USART_RX_BUFFER_SIZE     16
+//#define USART_RX_BUFFER_SIZE     16
+#define USART_DMA_BFF_LEN     64
 
 #ifdef __cplusplus
 extern "C" {
@@ -54,6 +55,7 @@ public:
    void onClearFlgRX(void);
    void onDeInit(void);
    void onSend(uint8_t *data, uint16_t len);
+   bool onRead(uint8_t *data, uint16_t &len);
    void onSetRX(uint16_t RxPackLen);
    uint16_t onGetRxLen(void);
 protected:
@@ -63,6 +65,10 @@ private:
 //   uint8_t *m_CrcTX;
 //   uint8_t *m_CrcRX;
    uint16_t m_RxPackLen;
+   
+   const uint16_t buffSize;
+   uint16_t lastPos;
+   uint16_t nextPos;
 };
 
 class CByteBuff
@@ -71,8 +77,10 @@ public:
    explicit CByteBuff(uint16_t len);
    ~CByteBuff();
 
+   void onAddData(uint8_t *data, uint16_t len);
    void onGetData(uint8_t *data, uint16_t len);
    bool onCheck(void);
+   void onClear(void);
    void onCopyRX(uint8_t *data, uint16_t &len);
 
 protected:
