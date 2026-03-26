@@ -491,7 +491,6 @@ public:
    uint8_t *m_mac;
 
    void onDmaComplete();
-   void watchdog(uint32_t now);
 
    void onInitSPI(char spi);
    void onSetSelect(void);

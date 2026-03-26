@@ -64,8 +64,10 @@ static volatile uint32_t timeLan_1 = 0;
 static volatile uint32_t timeLan_2 = 0;
 static volatile uint32_t timeLan_3 = 0;
 static volatile uint32_t timeLan_4 = 0;
+static volatile bool busyFlgLAN = false;
 static volatile bool RxFlgLAN = false;
 static volatile bool TxFlgLAN = false;
+static volatile uint32_t WD_cntr = 0;
 
 //static bool     unreleasedPacket = false;
 
@@ -106,10 +108,6 @@ void mainRunTime()
    uint8_t data1 = 0;
    if(RxFlgLAN)
    {
-      __disable_irq();
-      RxFlgLAN = false;
-      __enable_irq();
-
       pEthernet->m_pLanA->enc28j60_set_bank(ECON2);
       pEthernet->m_pLanA->onSetSelect();
       data1 = (ENC28J60_SPI_BFS | (ECON2 & ENC28J60_ADDR_MASK));
@@ -118,6 +116,9 @@ void mainRunTime()
       HAL_SPI_Transmit(&hspi3, &data1, 1, 1);
       delay_us(1);
       pEthernet->m_pLanA->onClrSelect();
+      __disable_irq();
+      RxFlgLAN = false;
+      __enable_irq();
 
       uint8_t *pDat = 0;
       uint16_t *pLen = 0;
@@ -136,6 +137,22 @@ void mainRunTime()
 
 void mainTickRunTime() // 1 msec
 {
+   if(busyFlgLAN)
+   {
+      /** Watch Dog counter for timeout = 10msec RX DMA SPI control **/
+      if(WD_cntr == 10)
+      {
+         __HAL_SPI_DISABLE(&hspi3);
+      };
+      if(++WD_cntr > 11)
+      {
+         __HAL_SPI_ENABLE(&hspi3);
+         WD_cntr = 0;
+         busyFlgLAN = false;
+         //printf("WD RX DMA SPI - timeout\n\r");
+      };
+   }
+   else WD_cntr = 0;
 };
 
 /* SPI3 init function */
@@ -235,9 +252,6 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* spiHandle)
 
   if(spiHandle->Instance==SPI3)
   {
-  /* USER CODE BEGIN SPI3_MspDeInit 0 */
-
-  /* USER CODE END SPI3_MspDeInit 0 */
     /* Peripheral clock disable */
     __HAL_RCC_SPI3_CLK_DISABLE();
 
@@ -247,13 +261,8 @@ void HAL_SPI_MspDeInit(SPI_HandleTypeDef* spiHandle)
     PC12     ------> SPI3_MOSI
     */
     HAL_GPIO_DeInit(GPIOC, GPIO_PIN_10|GPIO_PIN_11|GPIO_PIN_12);
-
-  /* USER CODE BEGIN SPI3_MspDeInit 1 */
-
-  /* USER CODE END SPI3_MspDeInit 1 */
   }
 }
-// =========== classes ============
 
 /**************************** ETHERNET *****************************/
 CEthernet::CEthernet() :
@@ -283,20 +292,6 @@ void CEthernet::onClearIrqFlagsLAN(void)
    m_pLanA->onClearIrqFlags();
 }
 
-/**
-nextFlgRX = true;
-for(uint8_t i=0; i<10; i++)
-{
-   if(nextFlgRX)
-   {
-      if(pBuffLAN->onGetWriteBuff(m_dPtr))
-      {
-         pEthernet->m_pLanA->enc28j60_recv_packet(m_dPtr.data, m_dPtr.byteCount, nextFlgRX);
-      };
-   }
-   else break;
-};
-**/
 //static bool nextFlgRX = false;
 //void CEthernet::onRunTime(void)
 //{
@@ -317,24 +312,25 @@ for(uint8_t i=0; i<10; i++)
 void CEthernet::onTickRunTime(void)
 {
    pEthernet->m_pLanA->startRX();
-
-//   switch(stepLan_2)    /** - **/
-//   {
-//      case 1:
-//         break;
-//      case 2:
-//         break;
-//      case 3:
-//         break;
-//      case 4:
-//         break;
-//      case 5:
-//         break;
-//      case 6:
-//         break;
-//      default:
-//         break;
-//   };
+/**
+   switch(stepLan_2)
+   {
+      case 1:
+         break;
+      case 2:
+         break;
+      case 3:
+         break;
+      case 4:
+         break;
+      case 5:
+         break;
+      case 6:
+         break;
+      default:
+         break;
+   };
+**/
 }
 
 bool CEthernet::onSend(uint8_t *data, uint16_t len)
@@ -361,18 +357,6 @@ bool CEthernet::onRecieve(uint8_t *data, uint16_t* pLen)
    if(len > 0) return true;
    return false;
 }
-
-//bool CEthernet::onRecieveDMA(uint8_t *data, uint16_t* pLen)
-//{
-//   //bool res = false;
-//   uint16_t len = m_pLanA->onRecieve(data);
-//   if(len > ENC28J60_MAXFRAME) len = ENC28J60_MAXFRAME;
-//   *pLen = len;
-//   if(len > 0) return true;
-//   return false;
-//}
-
-
 
 #define ENC28J60_FULL_DUPLEX_SUPPORT
 /*************************************CLAN***************************************/
@@ -548,12 +532,13 @@ CSPI::~CSPI()
 void CSPI::startRX()
 {
    if(TxFlgLAN) return;
-   if(busy == true) return;
+   if(busyFlgLAN) return;
    enc28j60_set_bank(EIR);
    enc28j60_read_op(ENC28J60_SPI_RCR, EIR);
    if(enc28j60_rcr(EPKTCNT) > 0)
    {
-      busy = true;
+      //busy = true;
+      busyFlgLAN = true;
       if(gNextPacketPtr == 0)
       {
          enc28j60_wcr(ERXRDPTL, (uint8_t)(ENC28J60_RXEND));
@@ -594,19 +579,10 @@ m_dPtrRx.data:
 
 void CSPI::onDmaComplete()
 {
-   busy = false;
+   //busy = false;
+   busyFlgLAN = false;
    RxFlgLAN = true;
    onClrSelect();
-}
-
-void CSPI::watchdog(uint32_t now)
-{
-   if (busy && (now - startTime > 5))
-   {
-      __HAL_SPI_DISABLE(_hspi);
-      __HAL_SPI_ENABLE(_hspi);
-      busy = false;
-   };
 }
 
 //*************************************----******************************
