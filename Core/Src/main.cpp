@@ -474,8 +474,8 @@ void ParseRxUSB(void)
             };
             ///////////////////////////////////////////////////////
             //WriteEEPROM(RxUSB, len);
-            //SystemReset();
-            SystemResetD((char *)__FILE__, __LINE__);
+            SystemReset();
+            //SystemResetD((char *)__FILE__, __LINE__);
          }
          else if(pAFL->flagFunc == 0x02)
          {  /** read Address pack from the FLASH */
@@ -521,6 +521,8 @@ void SystemReset(void)
    //pEthernet->m_pLanA->enc28j60_soft_reset();
    //pPortMB->onClearFlgRX();
    //pPortMB->onDeInit();
+   __disable_irq();
+   delay_us(10000);
    NVIC_SystemReset();
 }
 /*****************************************************************************/
@@ -529,7 +531,7 @@ void SystemReset(void)
 void Usart2Reset(void)
 {
    pPortMB->onClearFlgRX();
-   pPortMB->onSetRX(15);
+   pPortMB->onSetRX(USART_DMA_BFF_LEN);
    //pPortMB->onDeInit();
    //HAL_Delay(1);
    //pPortMB->onInit();
@@ -1216,6 +1218,7 @@ static volatile bool flagStateARP = false;
 static volatile uint32_t timeCntWD = 0;
 static volatile uint32_t arpCnt = 0;
 static volatile uint32_t dhcpCnt = 0;
+static volatile uint32_t arpRstCnt = 0;
 
 extern uint8_t *pBuffRX_MA;
 
@@ -1262,7 +1265,7 @@ void onSetRxFlgUSART(bool flg)   /** ------  call from USART RX IRQ  ------ **/
 /*****************************************************************************/
 //#define   DEBUG_PRINT_1
 //#define   DEBUG_PRINT_0
-//#define   DEBUG_PRINT
+#define   DEBUG_PRINT
 /*****************************************************************************/
 uint8_t MBRrx[USART_DMA_BFF_LEN];
 //uint8_t* MBRrx = NULL;
@@ -1336,6 +1339,7 @@ void main(void)
          if(pBuffMB->onCheck())
          {
             pBuffMB->onCopyRX(rxBuffMBR, rxLenBuffMBR);
+            cntErrUSART = 0;
          };
          pTimeEnRS485->onStop();
          ParseModbusRX(rxBuffMBR, rxLenBuffMBR);
@@ -1349,7 +1353,7 @@ void main(void)
       {
          if(makeFlgReqUID)
          {
-            step_UDP = 1;
+            step_UDP = 1;        /// start onHandleUDP()
             timeout_4 = 0;
             makeFlgReqUID = false;
          };
@@ -1359,25 +1363,25 @@ void main(void)
       if(debugFLAG1)
       {
          debugFLAG1 = false;
-         ///printf("ICMP OK! ->\n");
+         printf("ICMP OK! ->\n");
       };
 
       if(debugFLAG2)
       {
          debugFLAG2 = false;
-         ///printf("ICMP OK! <-\n");
+         printf("ICMP OK! <-\n");
       };
 
       if(debugFLAG11)
       {
          debugFLAG11 = false;
-         ///printf("DHCP <- OFR\n");
+         printf("DHCP <- OFR\n");
       };
 
       if(debugFLAG12)
       {
          debugFLAG12 = false;
-         ///printf("DHCP <- ACK\n");
+         printf("DHCP <- ACK\n");
       };
 
       if(debugFLAG13)
@@ -1385,10 +1389,10 @@ void main(void)
          printf("DHCP OK!\n");
          debugFLAG13 = false;
          ///printf("leaseTime: %d sec\r\n", addrLAN.leaseTime);
-//         printf("DHCP Server MAC: ");
-//         showMAC((char *)(addrLAN.servMAC));
-//         printf("Your IP Address: ");
-//         showIP(addrLAN.deviceIP);
+         printf("DHCP Server MAC: ");
+         showMAC((char *)(addrLAN.servMAC));
+         printf("Your IP Address: ");
+         showIP(addrLAN.deviceIP);
       };
 #endif
       /***********************************************************************/
@@ -1425,8 +1429,7 @@ void main(void)
 
          /********************************************************************/
          /*************** TIC 30 msec : TIC 30 msec : TIC 30 msec ************/
-         //if(++countTm >= 50) // 50 msec
-         if(++countTm >= 30) // 50 msec
+         if(++countTm >= 30) // 30 msec
          {
             countTm = 0;
             /** loop request slave RS485-MBR address: from 1 ... to 24, time = 24*30msec = 720msec */
@@ -1435,15 +1438,11 @@ void main(void)
                /***** MB RQ: Read UID card status, reg. address: 0x0001, count: 5 ***/
 #ifdef MODBUS_REQ
                pModbus->onReadREG(tmpi, 0x0001, 5);
-               //pModbus->onReadREG(1, 0x0001, 5);
+               //pModbus->onReadREG(1, 0x0001, 5);    /// for DEBUG MODE
                if(tmpi == 1)
                {
-                  //printf("Q\r\n");
-                  ++cntErrUSART;
-                  //if(cntErrUSART > 1) printf("Lost USART TX-RX: %d\r\n", cntErrUSART);
-                  if(cntErrUSART > 2) Usart2Reset();
-                  //if(cntErrUSART > 5) SystemReset();
-                  if(cntErrUSART > 5) SystemResetD((char *)__FILE__, __LINE__);
+                  if(cntErrUSART > 20) Usart2Reset();       /// time 6 sec
+                  if(++cntErrUSART > 100) SystemReset();    /// time 30 sec
                };
 #endif
 
@@ -1459,7 +1458,7 @@ void main(void)
             };
             if(tmpi >= 24) tmpi = 0;
          };
-         /*************** TIC 25 msec : TIC 25 msec : TIC 25 msec ************/
+         /*************** TIC 30 msec : TIC 30 msec : TIC 30 msec ************/
          /********************************************************************/
 
 #ifdef ARP_SECTOR
@@ -1488,6 +1487,11 @@ void main(void)
 
          onMakeBlinkRedLED();
          onMakeBlinkGreenLED();
+         if(++arpRstCnt > 600000) // time delay 10 min for restore ARP
+         {
+            arpRstCnt = 0;
+            step_ARP = 1;     // start serial request ARP for server MAC
+         };
       };
       /******************* TIC 1 msec : TIC 1 msec : TIC 1 msec **************/
       /***********************************************************************/
@@ -1502,43 +1506,50 @@ void main(void)
 /*****************************************************************************/
 void onHandleARP(void)
 {
-   //     cycle ARP request for get MAC of the User DataBase Server    //
+   /**                           TIC 1 msec                      **/
+   /** cycle ARP request for get MAC of the User DataBase Server **/
    if(step_ARP == 1)
    {
-      if(++timeout_1 > 1000)
+      if(++timeout_1 > 1000) // time delay 1 sec for start 1 ARP Request
       {
          ArpReqServerUBD();
          timeout_1 = 0;
          ++step_ARP;
-         arpCnt = 0;
+         arpCnt = 0;    // for system reset
+         arpRstCnt = 0;
       };
    }
    else if(step_ARP == 2)
    {
-      if(++timeout_1 > 1000)
+      if(++timeout_1 > 1000) // time delay 1 sec for start 2 ARP Request
       {
          flagStateARP = false;
          ArpReqServerUBD();
          timeout_1 = 0;
          ++step_ARP;
-         //if(++arpCnt > 3) SystemReset();
-         if(++arpCnt > 3) SystemResetD((char *)__FILE__, __LINE__);
+         arpRstCnt = 0;
+         if(++arpCnt > 5) 
+         {
+            SetFlagServerUBD(false);
+            step_ARP = 0;
+            printf("NOT response ARP for server?\n\r");
+         };
       };
    }
    else if(step_ARP == 3)
    {
       if(flagStateARP)
       {
-         arpCnt = 0;
          SetFlagServerUBD(true);
-         //txFlgLAN1 = true;
-         ++step_ARP;
+         arpCnt = 0;
+         step_ARP = 0;
          timeout_1 = 0;
-         step_DHCP = 1;
+         step_DHCP = 1;    // start serial request DHCP for get local IP
+         printf("ARP response for server OK!!!\n\r");
       }
       else
       {
-         if(++timeout_1 > 1000)
+         if(++timeout_1 > 4000)  // time delay 4 sec
          {
             timeout_1 = 0;
             step_ARP = 2;
@@ -1547,16 +1558,20 @@ void onHandleARP(void)
    }
    else if(step_ARP == 4)
    {
-      if(++timeout_1 > 1800000)
-      {
-         timeout_1 = 0;
-         step_ARP = 2;
-         step_DHCP = 0;
-         step_PING = 0;    /// PING
-         step_UDP = 0;    /// UDP
-      };
+      step_ARP = 0;
+//      if(++timeout_1 > 1800000)
+//      {
+//         timeout_1 = 0;
+//         step_ARP = 2;
+//         step_DHCP = 0;
+//         step_PING = 0;    /// PING
+//         step_UDP = 0;    /// UDP
+//      };
    };
 }
+
+//if(++arpCnt > 3) SystemReset();
+//if(++arpCnt > 3) SystemResetD((char *)__FILE__, __LINE__);
 /*****************************************************************************/
 
 /*****************************************************************************/
@@ -1577,8 +1592,6 @@ void onHandleDHCP(void)
    {
       DhcpOfferFlg = false;
       SendDiscoverDHCP(GetDhcpCntrID());
-      //if(++dhcpCnt > 5) SystemReset();
-      if(++dhcpCnt > 5) SystemResetD((char *)__FILE__, __LINE__);
       ++step_DHCP;
    }
    else if(step_DHCP == 3)
@@ -1603,8 +1616,6 @@ void onHandleDHCP(void)
    {
       DhcpAckFlg = false;
       SendRequestDHCP((uint8_t *)&DhcpOfferAddr, GetDhcpCntrID());
-      //if(++dhcpCnt > 5) SystemReset();
-      if(++dhcpCnt > 5) SystemResetD((char *)__FILE__, __LINE__);
       timeout_2 = 0;
       ++step_DHCP;
    }
@@ -1647,12 +1658,13 @@ void onHandlePING(void)
    if(flgPNG == true)
    {
       switch(step_PING)
-      {  /** ================================== **/
+      {  /** ========= router IP PING ======== **/
          case 1:  //-----------------------//
             if(++timeout_3 > 1000)  /// PING time out = 1 sec
             {
                ++step_PING;
                timeout_3 = 0;
+               cntPingError = 0;
             };
             break;
          case 2:  //-----------------------//
@@ -1676,29 +1688,27 @@ void onHandlePING(void)
             {
                if(++timeout_3 > 500)
                {
-                  step_PING = 5;
+                  if(++cntPingError > 10) SystemReset();
+                  step_PING = 2;
                   timeout_3 = 0;
-                  //if(++cntPingError > 3) SystemReset();
-                  if(++cntPingError > 3) SystemResetD((char *)__FILE__, __LINE__);
-
                };
             };
             break;
          case 4:  //-----------------------//
-            if(++timeout_3 > 1000)
+            if(++timeout_3 > 60000)    // time delay 1 min for PING to router
             {
                step_PING = 2;
                timeout_3 = 0;
             };
             break;
-         case 5:  //-----------------------//
-            if(++timeout_3 > 100)
-            {
-               printf("lost %d PING!\r\n", cntPingError);
-               step_PING = 2;
-               timeout_3 = 0;
-            };
-            break;
+//         case 5:  //-----------------------//
+//            if(++timeout_3 > 100)
+//            {
+//               //printf("lost %d PING!\r\n", cntPingError);
+//               step_PING = 2;
+//               timeout_3 = 0;
+//            };
+//            break;
          default:  //-----------------------//
             break;
       };

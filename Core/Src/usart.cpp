@@ -282,55 +282,14 @@ void CPortM::onClearFlgRX(void)
    onShowREG32(tempR);
    printf("------------------\r\n");
 #endif
-
-   //uint8_t temp = 0;
    //UNUSED(temp);
-   if(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_ORE))
-   {
-      __HAL_UART_CLEAR_OREFLAG(&huart2);
-#ifdef USART_REG_PRINT
-      printf("flag ORE\n\r");
-#endif
-   };
-   if(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_FE))
-   {
-      __HAL_UART_CLEAR_FEFLAG(&huart2);
-#ifdef USART_REG_PRINT
-      printf("flag FE\n\r");
-#endif
-   };
-   if(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_PE))
-   {
-      __HAL_UART_CLEAR_PEFLAG(&huart2);
-#ifdef USART_REG_PRINT
-      printf("flag PE\n\r");
-#endif
-   };
-   if(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_RXNE))
-   {
-      while(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_RXNE)) temp = huart2.Instance->DR;
-#ifdef USART_REG_PRINT
-      printf("flag RXNE\n\r");
-#endif
-   };
-   if(__HAL_DMA_GET_FLAG(&hdma_usart2_rx, DMA_FLAG_TCIF0_4))
-   {
-//      __HAL_DMA_DISABLE(&hdma_usart2_rx);
-      __HAL_DMA_CLEAR_FLAG(&hdma_usart2_rx, DMA_FLAG_TCIF0_4);
-//      __HAL_DMA_ENABLE(&hdma_usart2_rx);
-#ifdef USART_REG_PRINT
-      printf("flag DMA TCIF0_4\n\r");
-#endif
-   };
-   if(__HAL_DMA_GET_FLAG(&hdma_usart2_rx, DMA_FLAG_HTIF0_4))
-   {
-//      __HAL_DMA_DISABLE(&hdma_usart2_rx);
-      __HAL_DMA_CLEAR_FLAG(&hdma_usart2_rx, DMA_FLAG_HTIF0_4);
-//      __HAL_DMA_ENABLE(&hdma_usart2_rx);
-#ifdef USART_REG_PRINT
-      printf("flag DMA HTIF0_4\n\r");
-#endif
-   };
+   __HAL_UART_CLEAR_NEFLAG(&huart2);  
+   __HAL_UART_CLEAR_OREFLAG(&huart2);
+   __HAL_UART_CLEAR_FEFLAG(&huart2);
+   __HAL_UART_CLEAR_PEFLAG(&huart2);
+   __HAL_DMA_CLEAR_FLAG(&hdma_usart2_rx, DMA_FLAG_TCIF0_4);
+   __HAL_DMA_CLEAR_FLAG(&hdma_usart2_rx, DMA_FLAG_HTIF0_4);
+   while(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_RXNE)) temp = huart2.Instance->DR;
    temp = 0;
 }
 
