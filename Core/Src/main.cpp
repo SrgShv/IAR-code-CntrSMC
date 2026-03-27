@@ -474,8 +474,8 @@ void ParseRxUSB(void)
             };
             ///////////////////////////////////////////////////////
             //WriteEEPROM(RxUSB, len);
+            HAL_Delay(200);
             SystemReset();
-            //SystemResetD((char *)__FILE__, __LINE__);
          }
          else if(pAFL->flagFunc == 0x02)
          {  /** read Address pack from the FLASH */
@@ -1211,7 +1211,7 @@ static volatile uint32_t countCicle = 0;
 static volatile uint32_t cntReqUDP = 0;
 static volatile uint32_t cntPingError = 0;
 uint8_t rxPackBuff[256];
-static uint16_t rxPackLen = 0;
+//static uint16_t rxPackLen = 0;
 static volatile uint32_t controlTic = 0;
 static volatile bool controlTicFlg = false;
 static volatile bool flagStateARP = false;
@@ -1701,14 +1701,6 @@ void onHandlePING(void)
                timeout_3 = 0;
             };
             break;
-//         case 5:  //-----------------------//
-//            if(++timeout_3 > 100)
-//            {
-//               //printf("lost %d PING!\r\n", cntPingError);
-//               step_PING = 2;
-//               timeout_3 = 0;
-//            };
-//            break;
          default:  //-----------------------//
             break;
       };
@@ -1731,9 +1723,9 @@ static volatile uint32_t err_count = 0;
             ++step_UDP;
             timeout_4 = 0;
             cntReqUDP = 0;
-            step_PING = 0;
+            //step_PING = 0;
             timeout_3 = 0;
-            flgPNG = false;
+            //flgPNG = false;
             err_count = 0;
          };
          break;
@@ -1742,6 +1734,7 @@ static volatile uint32_t err_count = 0;
          {
             sendUDPA(servUDB.serverMAC, servUDB.serverIP, servUDB.serverPort , buffDataReqUID, (uint16_t)sizeof(struct sDataUDP));
             StartBlinkRedLed();
+            printf("request UDP!!!\n\r");
             ++step_UDP;
             if(++cntReqUDP >= 3) step_UDP = 0;
          }
@@ -1754,6 +1747,7 @@ static volatile uint32_t err_count = 0;
             timeout_4 = 0;
             respFlgReqUID = false;
             err_count = 0;
+            printf("Successful request UDP!!!\n\r");
          }
          else
          {
@@ -1761,8 +1755,11 @@ static volatile uint32_t err_count = 0;
             {
                step_UDP = 2;
                timeout_4 = 0;
-               //printf("!!! === timeout response UDP === !!!\r\n");
-               if(++err_count > 3)  SystemResetD((char *)__FILE__, __LINE__);
+               if(++err_count > 3)  /// 1 + 3 attempt send UDP
+               {
+                  step_UDP = 0;
+                  printf("Unsuccessful request UDP!!!\n\r");
+               };
             };
          };
          break;

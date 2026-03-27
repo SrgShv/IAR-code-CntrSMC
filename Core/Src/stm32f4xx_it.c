@@ -78,7 +78,7 @@ void HardFault_Handler(void)
 assert_failed((uint8_t *)__FILE__, __LINE__);
 #endif
 
-   SystemResetD((char *)__FILE__, __LINE__);
+   SystemReset();
    while (1)
    {
    };
