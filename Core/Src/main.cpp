@@ -1686,9 +1686,7 @@ static volatile uint32_t err_count = 0;
             ++step_UDP;
             timeout_4 = 0;
             cntReqUDP = 0;
-            //step_PING = 0;
             timeout_3 = 0;
-            //flgPNG = false;
             err_count = 0;
          };
          break;
@@ -1697,7 +1695,7 @@ static volatile uint32_t err_count = 0;
          {
             sendUDPA(servUDB.serverMAC, servUDB.serverIP, servUDB.serverPort , buffDataReqUID, (uint16_t)sizeof(struct sDataUDP));
             StartBlinkRedLed();
-            printf("request UDP!!!\n\r");
+//            printf("request UDP!!!\n\r");
             ++step_UDP;
             if(++cntReqUDP >= 3) step_UDP = 0;
          }
@@ -1710,7 +1708,7 @@ static volatile uint32_t err_count = 0;
             timeout_4 = 0;
             respFlgReqUID = false;
             err_count = 0;
-            printf("Successful request UDP!!!\n\r");
+//            printf("Successful request UDP!!!\n\r");
          }
          else
          {
@@ -1721,7 +1719,7 @@ static volatile uint32_t err_count = 0;
                if(++err_count > 3)  /// 1 + 3 attempt send UDP
                {
                   step_UDP = 0;
-                  printf("Unsuccessful request UDP!!!\n\r");
+//                  printf("Unsuccessful request UDP!!!\n\r");
                };
             };
          };
@@ -1884,7 +1882,6 @@ void SystemClock_Config(void)
   * @retval None
   */
 
-
 void _Error_Handler(char * file, int line)
 {
    printf((const char *)"ERROR - ");
@@ -1894,51 +1891,6 @@ void _Error_Handler(char * file, int line)
    {
    };
 }
-
-void Diagnostic(void)
-{
-   printf("ESTAT: ");
-   getDiagnosticReg8(false, ESTAT, 1);
-   printf("EIE: ");
-   getDiagnosticReg8(false, EIE, 1);
-   printf("EIR: ");
-   getDiagnosticReg8(false, EIR, 1);
-   printf("ECON1: ");
-   getDiagnosticReg8(false, ECON1, 1);
-   printf("ECON2: ");
-   getDiagnosticReg8(false, ECON2, 1);
-}
-
-void getDiagnosticReg8(bool stop, uint8_t adr, uint32_t len) // ESTAT_INT
-{
-   for(uint32_t i=0; i<len; i++)
-   {
-      pEthernet->m_pLanA->enc28j60_prnt8(adr+i);
-   };
-
-   if(stop)
-   {
-      while(1)
-      {
-      };
-   };
-}
-
-void getDiagnosticReg16(bool stop, uint8_t adr, uint32_t len)
-{
-   for(uint32_t i=0; i<len; i++)
-   {
-      pEthernet->m_pLanA->enc28j60_prnt16(adr+i);
-   };
-
-   if(stop)
-   {
-      while(1)
-      {
-      };
-   };
-}
-
 
 void showPack(uint8_t *data, uint32_t len)
 {
@@ -2011,12 +1963,6 @@ void assert_failed(uint8_t *file, uint32_t line)
 //      if(pTimeActiveRX->onIsTimeOut())
 //      {
 //         printf("USART RX ERROR!!!\r\n");
-//         pTimeActiveRX->onStop();
-//         //Usart2Reset();
-//
-////         pPortMB->onClearFlgRX();
-////         pPortMB->onDeInit();
-////         pPortMB->onInit();
 //         //SystemReset();
 //      };
 
@@ -2027,145 +1973,9 @@ void assert_failed(uint8_t *file, uint32_t line)
 //assert_failed((uint8_t *)__FILE__, __LINE__);
 //#endif
 
-//      printf("DHCP Server MAC: ");
-//      showMAC((char *)(addrLAN.servMAC));
-//      printf("Your IP Address: ");
-//      showIP(addrLAN.deviceIP);
-//      SWO_PrintString("Server Identifier: ");
-//      showIP(addrLAN.dhcpServIP);
-//      sprintf(dsstr, "Lease Time: %d\n", (int)(addrLAN.leaseTime));
-//      SWO_PrintString(dsstr);
-//      SWO_PrintString("Subnet Mask: ");
-//      showIP(addrLAN.subNetMsk);
-//      SWO_PrintString("Router: ");
-//      showIP(addrLAN.routerIP);
-//      SWO_PrintString("Name Server: ");
-//      showIP(addrLAN.nameServ);
-//      SWO_PrintString("Domain name server: ");
-//      showIP(addrLAN.dnsIP);
-
 //   __disable_irq();
 //   __enable_irq();
 //   enableExtiIRQ_A(true);
-
-//   delete pTimeOutMBR;
-   //delete pTimeOutMBTX;
-//   delete pTimeOutUID;
-//   delete pTimeOutPING;
-//   delete pTimeOutSARP;
-//   delete pBuffUSB;
-//   delete pBuffMB;
-//   delete pBuffPING;
-
-//   pBuffMB = new CByteBuff(255);
-//   pBuffPING = new CByteBuff(1600);
-//   pTimeOutMBR = new CTimeOut();
-//   pTimeOutRELAY = new CTimeOut();
-   //pTimeOutMBTX = new CTimeOut();
-//   pTimeOutLEDR = new CTimeOut();
-//   pTimeOutLEDG = new CTimeOut();
-//   pTimeOutUID = new CTimeOut();
-//   pTimeOutPING = new CTimeOut();
-//   pTimeOutSARP = new CTimeOut();
-//   pBuffLanA = new CBuffLAN(RX_BUFF_SZ, 2);
-//   pBuffUSB = new CBuffLAN(100, 3);
-
-
-//		/** if response MBR pack from slave             */
-//      if(true == pTimeOutMBR->onIsActive(countID))
-//      {
-//         if(pBuffMB->onCheck())
-//         {
-//            pBuffMB->onCopyRX(rxPackBuff, rxPackLen);
-//            //printf("RESPONSE-MBR:\n");
-//            rcrc16 = 0x00FF & (uint16_t)rxPackBuff[rxPackLen-1];
-//            rcrc16 |= 0xFF00 & ((uint16_t)rxPackBuff[rxPackLen-2])<<8;
-//            tcrc16 = onCRC16(rxPackBuff, rxPackLen-2);
-//#ifdef   DEBUG_PRINT
-//            showPack(rxPackBuff, rxPackLen);
-//            sprintf(dstr, "crc16-A: 0x%04X; crc16-B: 0x%04X\n", (int)rcrc16, (int)tcrc16);
-//            printf((char *)dstr);
-//#endif
-//            if(tcrc16 == rcrc16) ParseModbusRX(rxPackBuff, rxPackLen); // -> line 189
-//            pTimeOutMBR->onStop();
-//         };
-//      };
-
-
-               /**
-//               if(pTimeOutMBR->onIsTimerOFF())
-//               {
-//                  ++countID;
-//                  SetMbrType(MBR_TYPE_UID);
-//                  pModbus->onReadREG(tmpi, GetMbrAddr(), 5);
-//                  pTimeOutMBR->onStart(MBR_TIME_OUT, countID); // t = 4 msec
-//                  //printf("REQ-MBR\n");
-//               };
-               */
-
-//      /** period T=10 msec                            */
-//      if(flagTmW1 != flagTm1)
-//      {
-//         if(flagTmW1) flagTmW1 = false;
-//         else flagTmW1 = true;
-
-//         /** send Request DHCP to ROUTER for
-//             automatic get local IP address */
-//         if(false == CheckIpLeaseTime())
-//         {  /** don't have local IP address */
-//            if(testCnt == 0)
-//            {  /** cycle DHCP request
-//               period time = 10 sec */
-//               if(++DhcpCntrID >= 1000000) DhcpCntrID = 0;
-//               SendDiscoverDHCP(GetDhcpCntrID());
-//            };
-//            if(++testCnt >= 1000) testCnt = 0;
-//         };
-
-//         if(true == CheckIpLeaseTime())
-//         {
-//            /** cycle ARP request period = 3 min (180 sec)
-//            for get MAC of the User DataBase Server */
-//            if(arpTimeCnt == 2)
-//            {
-//               ArpReqServerUBD();
-//               pTimeOutSARP->onStart(ARP_TIME_OUT, 200);
-//            };
-//            if(++arpTimeCnt >= ARP_TIME_PERIOD) arpTimeCnt = 0;
-
-//            /** cycle PING request period = 3 min (180 sec)
-//            for check connection to the Router */
-//            if(pingTimeCnt == 1)
-//            {
-//               ++countPing;
-//               PingToRouter();
-//               /** PING time out = 1 sec */
-//               pTimeOutPING->onStart(PING_TIME_OUT, countPing);
-//            };
-//            if(++pingTimeCnt >= PING_TIME_PERIOD) pingTimeCnt = 0;
-//         };
-
-//         if(true == pTimeOutSARP->onIsTimeOut())
-//         {  /** time out of ARP request
-//            to the Server UBD */
-//            printf("Timeout request ARP to the Server UBD\n");
-//            pTimeOutSARP->onStop();
-//            SetFlagServerUBD(false);
-//         };
-
-//         /** test: send UDP pack */
-//         if(sendUdpCntr == 2)
-//         {
-////            if(servUDB.flag == 1) sendUDPA(servUDB.serverMAC, GetServerIPA(), TARG_PORT_A, tstData, (uint16_t)sizeof(struct sDataUDP));
-//         };
-//         if(++sendUdpCntr >= 100)
-//         {
-//            sendUdpCntr = 0;
-//         };
-
-//         uint16_t *ptr = 0;
-
-//      };
 
 #endif
 
