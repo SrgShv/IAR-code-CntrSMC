@@ -546,7 +546,6 @@ protected:
 
 private:
    uint8_t m_macadr[6];
-   char m_MacFlag;
 
 };
 
@@ -570,7 +569,6 @@ public:
    CLAN m_LanA;
 };
 
-//void setStep(uint8_t stepNo, uint8_t pos);
 void onSetIRQ_DMA_SPI3(void);
 void delay_us(uint32_t us);
 void initAddrLAN(void);

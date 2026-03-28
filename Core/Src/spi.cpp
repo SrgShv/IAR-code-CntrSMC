@@ -17,6 +17,20 @@
   ******************************************************************************
   */
 
+/**
+m_dPtrRx.data:
+
+[0]  garbage
+[1]  NextPacketPtrL
+[2]  NextPacketPtrH
+[3]  PacketLengthL
+[4]  PacketLengthH
+[5]  StatusL
+[6]  StatusH
+[7]  Payload[0]
+[8]  Payload[1]
+...
+*/
 /* Includes ------------------------------------------------------------------*/
 #include "spi.h"
 #include "stdio.h"
@@ -72,31 +86,6 @@ void delay_us(uint32_t us)
    uint32_t tcnt = 0;
    while(++tcnt < us*5) ;
 }
-
-//void setStep(uint8_t stepNo, uint8_t pos)
-//{
-//   switch(stepNo)    /** RX DMA-SPI-LAN **/
-//   {
-//      case 1:
-//         stepLan_1 = pos;
-//         break;
-//      case 2:
-//         stepLan_2 = pos;
-//         break;
-//      case 3:
-//         stepLan_3 = pos;
-//         break;
-//      case 4:
-//         stepLan_4 = pos;
-//         break;
-//      case 5:
-//         break;
-//      case 6:
-//         break;
-//      default:
-//         break;
-//   };
-//}
 
 /** After IRQ DMA TxRx complete => **/
 void mainRunTime()
@@ -283,6 +272,7 @@ void CEthernet::onRestart(uint8_t *MAC)
    m_pLanA->onInit(MAC);
 }
 
+/**  TIC 1 msec  **/
 void CEthernet::onTickRunTime(void)
 {
    pEthernet->m_pLanA->startRX();
@@ -321,11 +311,8 @@ bool CEthernet::onSend(uint8_t *data, uint16_t len)
 
 #define ENC28J60_FULL_DUPLEX_SUPPORT
 /*************************************CLAN***************************************/
-CLAN::CLAN() :
-   m_MacFlag(0)//,
-   //m_rxBuff(0)
+CLAN::CLAN()
 {
-   //m_rxBuff = new uint8_t [RX_BUFF_SZ];
 }
 
 #define CODE_SWITCH_1
@@ -451,7 +438,6 @@ void CLAN::onInit(uint8_t *mac)
    enc28j60_wcr(ERDPTL, (0));          // Buffer read pointer L
    enc28j60_wcr(ERDPTH, (0));          // Buffer read pointer H
 
-   m_MacFlag = 1;
    //HAL_Delay(20);
    delay_us(20000);
 
@@ -509,27 +495,11 @@ void CSPI::startRX()
    };
 }
 
-/**
-m_dPtrRx.data:
-
-[0]  garbage
-[1]  NextPacketPtrL
-[2]  NextPacketPtrH
-[3]  PacketLengthL
-[4]  PacketLengthH
-[5]  StatusL
-[6]  StatusH
-[7]  Payload[0]
-[8]  Payload[1]
-...
-*/
-
 void CSPI::onDmaComplete()
 {
    busyFlgLAN = false;
    RxFlgLAN = true;
    onClrSelect();
-//   printf("LAN => Eth\n\r");
 }
 
 //*************************************----******************************
@@ -669,20 +639,6 @@ void CSPI::enc28j60_read_buffer(uint8_t *buf, uint16_t len)
 	//HAL_SPI_Receive_DMA(&hspi3, buf, len);                   /** RX SPI PACK - RX SPI PACK - RX SPI PACK - RX SPI PACK **/
 }
 
-// Write Rx/Tx buffer (at EWRPT)
-//void CSPI::enc28j60_write_buffer(uint8_t *buf, uint16_t len)
-//{
-//
-//   uint8_t data = ENC28J60_SPI_WBM;
-//   this->onSetSelect();
-//   HAL_SPI_Transmit(&hspi3, &data, 1, 1);
-//   HAL_SPI_Transmit_DMA(&hspi3, buf, len);                  /** TX SPI PACK - TX SPI PACK - TX SPI PACK - TX SPI PACK **/
-//   onStartTimer4(6);                                        /** (5*0.1msec = 0.5msec) -> onSetSelENC28J60(false);   */
-//	//HAL_SPI_Transmit(&hspi3, buf, len, 1);                       /** TX SPI PACK - TX SPI PACK - TX SPI PACK - TX SPI PACK **/
-//   //HAL_Delay(1);
-//   delay_us(10000);
-//}
-
 // Read PHY register
 uint16_t CSPI::enc28j60_read_phy(uint8_t adr)
 {
@@ -706,21 +662,6 @@ void CSPI::enc28j60_write_phy(uint8_t adr, uint16_t data)
 void CSPI::enc28j60_soft_reset()
 {
    uint32_t i = 0;
-   printf("Soft reset\r\n");
-//	this->onSetSelect();
-//	//enc28j60_tx(ENC28J60_SPI_SC);
-//   delay_us(10000);
-//   this->onClrSelect();
-//   delay_us(10000);
-
-   //this->onSetSelect();
-//   delay_us(20000);         //
-//   this->onSetReset();
-//   delay_us(50000);
-//   this->onClrReset();
-//   delay_us(50000);
-   //this->onClrSelect();
-
    while(enc28j60_rcr(ECON1) & ECON1_TXRTS)
 	{
       if(++i > 3000) break;
@@ -740,9 +681,6 @@ void CSPI::enc28j60_soft_reset()
       if(++i > 3000) break;
    };
 
-   //gNextPacketPtr = ENC28J60_RXSTART;
-   // clear interrupt flags
-//   this->enc28j60_wcr(EIR, 0x00);
    this->enc28j60_set_bank(ECON1);
    this->enc28j60_bfc(ECON1, ECON1_RXEN);
    delay_us(50000);
@@ -776,12 +714,8 @@ void CSPI::enc28j60_soft_reset()
    delay_us(100);
    this->enc28j60_write_phy(PHCON1, PHCON1_PDPXMD);
    delay_us(100);
-
-   //onUpdate();
-   //printf("Ethernet restart\r\n");
-   //onRestartInitEthernet();
 }
-//#define SEND_BUFF_SWITCH
+
 void CSPI::enc28j60_send_packet(uint8_t *data, uint16_t len)
 {
    if(RxFlgLAN) return;
@@ -814,113 +748,17 @@ void CSPI::onSetReqTX(void)
    enc28j60_bfs(ECON1, ECON1_TXRTS); // Request packet send
 }
 
-//#define DEBUG_PRINT_1
-//#define DEBUG_PRINT_1N
-//static volatile uint16_t nextPacket = 0;
-//static volatile uint16_t byteCount = 0;
-//static volatile uint16_t status = 0;
-#define RX_SWITCH
-#define RECEIVE_BUFF_SWITCH
-sStatusRX mSTRX;
-uint8_t* dPtr = 0;
-
-//bool CSPI::enc28j60_recv_packet(uint8_t *buf, uint16_t *buflen, bool &next)
-//{
-//   /**
-//   gNextPacketPtr, ERXRDPT - ptr to dataPackNumber 1,2,3...
-//   ERDPT - ptr to memory address pos
-//   */
-//   static bool unreleasedPacket = false;
-//   static bool lostPacket = false;
-//   uint8_t data1 = 0;
-//
-//   if(false) ///unreleasedPacket) *************************************************
-//   {
-//      if(gNextPacketPtr == 0)   //(gNextPacketPtr == ENC28J60_RXSTART)
-//      {
-//         enc28j60_wcr(ERXRDPTL, (uint8_t)(ENC28J60_RXEND));
-//         enc28j60_wcr(ERXRDPTH, (uint8_t)((ENC28J60_RXEND)>>8));
-//      }
-//      else
-//      {
-//         enc28j60_wcr(ERXRDPTL, (uint8_t)(gNextPacketPtr-1));
-//         enc28j60_wcr(ERXRDPTH, (uint8_t)((gNextPacketPtr-1)>>8));
-//      };
-//      unreleasedPacket = false;
-//   };
-//
-//   if(false) ///((enc28j60_rcr(EPKTCNT) > 0) || (lostPacket == true)) *************
-//   {
-//      enc28j60_wcr(ERDPTL, (gNextPacketPtr));         // Buffer read pointer L
-//      enc28j60_wcr(ERDPTH, (gNextPacketPtr>>8));      // Buffer read pointer H
-//
-//      this->onSetSelect();
-//      uint8_t data = ENC28J60_SPI_RBM;
-//      HAL_SPI_Transmit(&hspi3, &data, 1, 1);
-//      HAL_SPI_Receive(&hspi3, (uint8_t*)&mSTRX, 6, 1);            /** RX SPI PACK - RX SPI PACK - RX SPI PACK - RX SPI PACK **/
-//      delay_us(1);
-//      this->onClrSelect();
-//      gNextPacketPtr = mSTRX.nextPacket;
-//      if(mSTRX.byteCount > 0)
-//      {
-//         if((mSTRX.status & 0x80) != 0)
-//         {
-//            this->onSetSelect();
-//            *buflen = mSTRX.byteCount - 4; //remove the CRC count
-//            HAL_SPI_Transmit(&hspi3, &data, 1, 1);
-//            HAL_SPI_Receive(&hspi3, buf, *buflen, 1);             /** RX SPI PACK - RX SPI PACK - RX SPI PACK - RX SPI PACK **/
-//            delay_us(1);
-//            this->onClrSelect();
-//            /********************************************/
-//            //enc28j60_bfs(ECON2, ECON2_PKTDEC);
-//            enc28j60_set_bank(ECON2);
-//            this->onSetSelect();
-//            data1 = (ENC28J60_SPI_BFS | (ECON2 & ENC28J60_ADDR_MASK));
-//            HAL_SPI_Transmit(&hspi3, &data1, 1, 1);
-//            data1 = ECON2_PKTDEC;
-//            HAL_SPI_Transmit(&hspi3, &data1, 1, 1);
-//            delay_us(1);
-//            this->onClrSelect();
-//            /********************************************/
-//         };
-//      };
-//      unreleasedPacket = true;
-//      enc28j60_set_bank(EIR);
-//      uint8_t fres = enc28j60_read_op(ENC28J60_SPI_RCR, EIR);
-//      if(enc28j60_rcr(EPKTCNT) > 0) next = true;
-//      else if(fres & 0x40) next = true;                           /** if flag PKTIF: Receive Packet Pending in EIR - 1 **/
-//      else next = false;
-//      lostPacket = next;
-//
-//#ifdef DEBUG_PRINT_1
-//      printf("gNextPacketPtr: %d\r\n", gNextPacketPtr);
-//      printf("byteCount: %d\r\n", mSTRX.byteCount);
-//      printf("status: 0x%04X\r\n", mSTRX.status);
-//      if(next) printf("next - true\r\n\n");
-//      else printf("next - false\r\n\n");
-//#endif
-//      return true;
-//   };
-//   return false;
-//}
-
-
-// Callback
 void HAL_SPI_RxCpltCallback(SPI_HandleTypeDef *hspi)
 {
    if (hspi->Instance == SPI3)
    {
-      //onSetIRQ_DMA_SPI3();
-      printf("DMA RxCpltCallback\n");
    };
 }
 
-// Callback
 void HAL_SPI_RxCpltCallback2(SPI_HandleTypeDef *hspi)
 {
    if (hspi->Instance == SPI3)
    {
-      printf("DMA RxCpltCallback 2\n");
    };
 }
 
@@ -936,82 +774,9 @@ void HAL_SPI_TxCpltCallback(SPI_HandleTypeDef *hspi)
 {
    if (hspi->Instance == SPI3)
    {
-      //printf("DMA SPI3 TxCpltCallback\n\r");
       pEthernet->m_pLanA->onClrSelect(); // CS = 1
       pEthernet->m_pLanA->enc28j60_write_op(ENC28J60_SPI_BFS, ECON1, ECON1_TXRTS);
       TxFlgLAN = false;
    };
 }
 
-//uint8_t rxDR[1600];
-//uint16_t CSPI::enc28j60_recv_packet_DMA(uint8_t *buf, uint16_t *len)
-//{
-//   uint16_t buflen = 0;
-//   len = (uint16_t *)&buflen;
-//   uint16_t nextPacket = 0;
-//   uint16_t byteCount = 0;
-//   uint16_t status = 0;
-//   static uint16_t gNextPacketPtr = ENC28J60_RXSTART;
-//   //&hspi3.Instance->DR = (uint8_t *)rxDR;
-//   if(unreleasedPacket)
-//   {
-//      if (gNextPacketPtr == 0)
-//      {
-//         enc28j60_wcr(ERXRDPTL, (uint8_t)(ENC28J60_RXEND));
-//         enc28j60_wcr(ERXRDPTH, (uint8_t)(ENC28J60_RXEND>>8));
-//      }
-//      else
-//      {
-//         enc28j60_wcr(ERXRDPTL, (uint8_t)(gNextPacketPtr - 1));
-//         enc28j60_wcr(ERXRDPTH, (uint8_t)((gNextPacketPtr - 1)>>8));
-//      };
-//      unreleasedPacket = false;
-//   };
-//   this->enc28j60_set_bank(1);
-//   if(enc28j60_rcr(EPKTCNT) > 0)
-//   {
-//      enc28j60_wcr(ERDPTL, (gNextPacketPtr));         // Buffer read pointer L
-//      enc28j60_wcr(ERDPTH, (gNextPacketPtr>>8));      // Buffer read pointer H
-//      enc28j60_read_buffer((uint8_t*)&nextPacket, 2);
-//		enc28j60_read_buffer((uint8_t*)&byteCount, 2);
-//		enc28j60_read_buffer((uint8_t*)&status, 2);
-//      gNextPacketPtr = nextPacket;
-//      buflen = byteCount - 4; //remove the CRC count
-//      this->onSetSelect();
-//      if((status & 0x80) != 0)
-//      {
-//         HAL_DMA_Start(&hdma_spi3_rx, (uint32_t)&hspi3.Instance->DR, (uint32_t)buf, (uint32_t)buflen);
-//         HAL_SPI_Receive_DMA(&hspi3, buf, (uint32_t)buflen);
-//         //HAL_DMA_PollForTransfer(&hdma_spi3_rx, HAL_DMA_FULL_TRANSFER, HAL_MAX_DELAY);
-//         //enc28j60_read_buffer(buf, buflen);
-//         enc28j60_bfs(ECON2, ECON2_PKTDEC);
-//         unreleasedPacket = true;
-//      }
-//      else buflen = 0;
-//   }
-//   else
-//   {
-//      buflen = 0;
-//   };
-//   return buflen;
-//
-//
-//
-//   //uint16_t buflen = enc28j60_rcr(EPKTCNT);
-//   //uint8_t readCommand = ENC28J60_SPI_RBM;
-//   //HAL_SPI_Transmit(&hspi3, &readCommand, 1, 1);
-//   //buflen = this->ENC28J60_GetReceivedPacketLength();
-////   HAL_DMA_Start(&hdma_spi3_rx, (uint32_t)&hspi3.Instance->DR, (uint32_t)buf, (uint32_t)buflen);
-////   HAL_SPI_Receive_DMA(&hspi3, buf, (uint32_t)buflen);
-////   HAL_DMA_PollForTransfer(&hdma_spi3_rx, HAL_DMA_FULL_TRANSFER, 1);
-////   *len = buflen;
-//   this->onClrSelect();
-//   return buflen;
-//}
-//*************************************CSPI**********************************
-
-//bool onCheckRxCount(void)
-//{
-//   if(enc28j60_rcr(EPKTCNT) > 0) return true;
-//   else return false;
-//}
