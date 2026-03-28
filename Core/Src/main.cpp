@@ -218,7 +218,7 @@ void setOnIRQ(bool flg)
 void setFlgDMA_LAN_RX(bool flg)
 {
    RxFlgLAN_DMA = flg;
-   printf("flg DMA LAN\n\r");
+//   printf("flg DMA LAN\n\r");
 }
 /*****************************************************************************/
 void setEnableTimerTX(uint32_t val)
@@ -281,8 +281,8 @@ GLED:       0x0006;
 RLED:       0x0004;
 ZOOMER:     0x0009;
 */
-#define   DEBUG_PRINT_MBR
-sMBR m_MBR;
+//#define   DEBUG_PRINT_MBR
+//sMBR m_MBR;
 void ParseModbusRX(uint8_t *data, uint16_t len)    // USART - RS485 RX: Modbus
 {
    uint8_t* pTxUID = 0;
@@ -401,10 +401,10 @@ void EthernetSend(uint8_t *data, uint16_t len)
 /**   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   IRQ LAN   **/
 /*****************************************************************************/
 //static bool nextFlgRX = false;
-volatile static bool IrqFlgRX = false;
+//volatile static bool IrqFlgRX = false;
 void handleRxIrqLanA(void)
 {
-   IrqFlgRX = true;
+   //IrqFlgRX = true;
    //++count_IRQ_LAN;
    //setStep(1, 1);
 //   /**
@@ -447,7 +447,7 @@ void ParseRxUSB(void)
    if(res == false) printf("RxUSB crc16 - error\n");
    else
    {
-      printf("RxUSB - OK\n");
+//      printf("RxUSB - OK\n");
       //showPack(RxUSB, len);
       if(pAFL->flagReq == 0x01)
       {
@@ -1220,7 +1220,7 @@ static volatile uint32_t arpCnt = 0;
 static volatile uint32_t dhcpCnt = 0;
 static volatile uint32_t arpRstCnt = 0;
 
-extern uint8_t *pBuffRX_MA;
+//extern uint8_t *pBuffRX_MA;
 
 void StartBlinkRedLed(void)
 {
@@ -1319,7 +1319,7 @@ void main(void)
 
       /** STATUS CONTROL                                     */
       mainRunTime();
-      
+
       while(pPortMB->onRead(MBRrx, MBRlen))
       {
          if(MBRlen > 0)
@@ -1330,7 +1330,7 @@ void main(void)
             pTimeEnRS485->onStart(2, 2);
          };
       };
-      
+
       /**
          timeout pause of the end serial RX
       */
@@ -1346,8 +1346,8 @@ void main(void)
          pBuffMB->onClear();
       };
 
-      /** 
-         Start UDP request to UBD server over Ethernet LAN 
+      /**
+         Start UDP request to UBD server over Ethernet LAN
       */
       if(GetFlagServerUBD())
       {
@@ -1528,7 +1528,7 @@ void onHandleARP(void)
          timeout_1 = 0;
          ++step_ARP;
          arpRstCnt = 0;
-         if(++arpCnt > 5) 
+         if(++arpCnt > 5)
          {
             SetFlagServerUBD(false);
             step_ARP = 0;

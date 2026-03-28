@@ -105,8 +105,8 @@ void MX_GPIO_Init(void)
   GPIO_InitStruct.Speed = GPIO_SPEED_FREQ_LOW;
   HAL_GPIO_Init(GPIOA, &GPIO_InitStruct);
 
-  HAL_NVIC_SetPriority(EXTI2_IRQn, 0, 1);
-  HAL_NVIC_EnableIRQ(EXTI2_IRQn);
+//  HAL_NVIC_SetPriority(EXTI2_IRQn, 0, 1);
+//  HAL_NVIC_EnableIRQ(EXTI2_IRQn);
 
 }
 

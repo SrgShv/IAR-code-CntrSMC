@@ -557,7 +557,7 @@ void CSPI::onDmaComplete()
    busyFlgLAN = false;
    RxFlgLAN = true;
    onClrSelect();
-   printf("LAN => Eth\n\r");
+//   printf("LAN => Eth\n\r");
 }
 
 //*************************************----******************************

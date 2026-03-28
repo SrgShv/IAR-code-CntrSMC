@@ -21,7 +21,6 @@
 #include "usart.h"
 #include "stdio.h"
 
-//#define USART_DMA_BFF_LEN     64
 //#define DEBUG_FLASH        /** DEBUG MODE - DEBUG MODE -  DEBUG MODE **/
 volatile bool USART_RXB = false;
 
@@ -31,8 +30,6 @@ DMA_HandleTypeDef hdma_usart2_tx;
 extern CByteBuff *pBuffMB;
 extern CPortM *pPortMB;
 extern void _Error_Handler(char *, int);
-
-/* USART2 init function */
 
 void MX_USART2_UART_Init(void)
 {
@@ -136,7 +133,7 @@ void HAL_UART_MspInit(UART_HandleTypeDef* uartHandle)
 
       HAL_NVIC_SetPriority(USART2_IRQn, 1, 3);
       HAL_NVIC_EnableIRQ(USART2_IRQn);
-      
+
       __HAL_DMA_ENABLE_IT(&hdma_usart2_rx, DMA_IT_TC);  // Завершення передачі
    }
 }
@@ -213,8 +210,6 @@ uint16_t onCRC16(const uint8_t *nData, uint16_t len)
    return crc;
 }
 // ================ classes =================
-uint8_t *pBuffRX_MA = 0;
-uint8_t *pBuffRX_MB = 0;
 uint8_t dma_txb[USART_DMA_BFF_LEN];
 uint8_t dma_rxb[USART_DMA_BFF_LEN];
 
@@ -228,28 +223,21 @@ CPortM::CPortM() :
 {
    m_buffTX = dma_txb;
    m_buffRX = dma_rxb;
-   pBuffRX_MA = (uint8_t *)&(m_buffRX[0]);
-   pBuffRX_MB = (uint8_t *)&(m_buffRX[m_RxPackLen]);
 }
 
 CPortM::~CPortM()
 {
-//    delete [] m_buffTX;
-//    delete [] m_buffRX;
 }
 
 void CPortM::onInit(void)
 {
    huart2.Instance = USART2;
-
 #ifdef DEBUG_FLASH
    huart2.Init.BaudRate = 115200;
 #else
    huart2.Init.BaudRate = onGetSpeedRS485();
 #endif
-
-   printf("BPS USART:%d\n\r", (int)huart2.Init.BaudRate);
-   //huart2.Init.BaudRate = USART_SPEED_BPS;
+   //printf("BPS USART:%d\n\r", (int)huart2.Init.BaudRate);
    huart2.Init.WordLength = UART_WORDLENGTH_8B;
    huart2.Init.StopBits = UART_STOPBITS_1;
    huart2.Init.Parity = UART_PARITY_NONE;
@@ -283,7 +271,7 @@ void CPortM::onClearFlgRX(void)
    printf("------------------\r\n");
 #endif
    //UNUSED(temp);
-   __HAL_UART_CLEAR_NEFLAG(&huart2);  
+   __HAL_UART_CLEAR_NEFLAG(&huart2);
    __HAL_UART_CLEAR_OREFLAG(&huart2);
    __HAL_UART_CLEAR_FEFLAG(&huart2);
    __HAL_UART_CLEAR_PEFLAG(&huart2);
@@ -318,27 +306,14 @@ void CPortM::onSend(uint8_t *data, uint16_t len)
       m_buffTX[i] = data[i];
    };
    setEnableRS485TX(true);
-
-#ifdef DEBUG_FLASH
-   uint32_t cnt = computeTxTime(115200, len);
-#else
-    //uint32_t cnt = computeTxTime(onGetSpeedRS485(), len);
-#endif
-
-   //setEnableTimerTX(cnt);
-   //huart2.gState = HAL_UART_STATE_READY;
    HAL_UART_Transmit_DMA(&huart2, m_buffTX, len);
-   //__HAL_DMA_ENABLE_IT(&hdma_usart2_rx, DMA_IT_TC);   // Завершення передачі
 }
 
 bool CPortM::onRead(uint8_t *data, uint16_t &len)
 {
-   ///if(HAL_UART_Receive(&huart2, m_buffRX, len, 100) == HAL_OK) return true;
-   ///return false;
    uint16_t cnt = 0;
    uint16_t nextPos = buffSize - DMA1_Stream5->NDTR;
-   //printf("NDTR:%d\n", (int)DMA1_Stream5->NDTR);
-   if(nextPos == lastPos) 
+   if(nextPos == lastPos)
    {
       len = 0;
       return false;
@@ -352,12 +327,10 @@ bool CPortM::onRead(uint8_t *data, uint16_t &len)
       {
          data[cnt++] = m_buffRX[i];
       };
-      //printf("onRead RS485\n\r");
-      //showPack(data, len);
-      lastPos = nextPos;    
+      lastPos = nextPos;
       return true;
    };
-   
+
    if(nextPos < lastPos)
    {
       cnt = 0;
@@ -370,10 +343,11 @@ bool CPortM::onRead(uint8_t *data, uint16_t &len)
       lastPos = nextPos;
       return true;
    };
+   return false;
 }
 
 void CPortM::onSetRX(uint16_t RxPackLen)
-{ 
+{
    USART2->SR &= ~(0x0001<<5);
    HAL_UART_Receive_DMA(&huart2, m_buffRX, RxPackLen);
 }
@@ -382,8 +356,6 @@ uint16_t CPortM::onGetRxLen(void)
 {
    return m_RxPackLen;
 }
-
-//==============================
 
 CByteBuff::CByteBuff(uint16_t len) :
    m_len(0),
@@ -453,9 +425,9 @@ void HAL_UART_RxCpltCallback(UART_HandleTypeDef *huart)
 {
    if(huart->Instance == USART2)
    {  /** Modbus RX  */
-      USART_RXB = true;
+      //USART_RXB = true;
       //onSetRxFlgUSART(true);
-      printf("RX:\n");
+      //printf("RX:\n");
       //pBuffMB->onGetData(pBuffRX_MA, rxLen);
    };
 }
