@@ -73,30 +73,30 @@ void delay_us(uint32_t us)
    while(++tcnt < us*5) ;
 }
 
-void setStep(uint8_t stepNo, uint8_t pos)
-{
-   switch(stepNo)    /** RX DMA-SPI-LAN **/
-   {
-      case 1:
-         stepLan_1 = pos;
-         break;
-      case 2:
-         stepLan_2 = pos;
-         break;
-      case 3:
-         stepLan_3 = pos;
-         break;
-      case 4:
-         stepLan_4 = pos;
-         break;
-      case 5:
-         break;
-      case 6:
-         break;
-      default:
-         break;
-   };
-}
+//void setStep(uint8_t stepNo, uint8_t pos)
+//{
+//   switch(stepNo)    /** RX DMA-SPI-LAN **/
+//   {
+//      case 1:
+//         stepLan_1 = pos;
+//         break;
+//      case 2:
+//         stepLan_2 = pos;
+//         break;
+//      case 3:
+//         stepLan_3 = pos;
+//         break;
+//      case 4:
+//         stepLan_4 = pos;
+//         break;
+//      case 5:
+//         break;
+//      case 6:
+//         break;
+//      default:
+//         break;
+//   };
+//}
 
 /** After IRQ DMA TxRx complete => **/
 void mainRunTime()
@@ -283,28 +283,6 @@ void CEthernet::onRestart(uint8_t *MAC)
    m_pLanA->onInit(MAC);
 }
 
-void CEthernet::onClearIrqFlagsLAN(void)
-{
-   m_pLanA->onClearIrqFlags();
-}
-
-//static bool nextFlgRX = false;
-//void CEthernet::onRunTime(void)
-//{
-//   printf("start RX => \n\r");
-//   pEthernet->m_pLanA->startRX();
-//   nextFlgRX = true;
-//   uint32_t dCnt = 0;
-//   while(nextFlgRX)
-//   {
-//      pEthernet->m_pLanA->startRX();
-//      //pBuffLAN->onGetWriteBuff(m_dPtr);
-//      //pEthernet->m_pLanA->enc28j60_recv_packet(m_dPtr.data, m_dPtr.byteCount, nextFlgRX);
-//      printf("++Land %d\n\r", dCnt);
-//      ++dCnt;
-//   };
-//}
-
 void CEthernet::onTickRunTime(void)
 {
    pEthernet->m_pLanA->startRX();
@@ -479,12 +457,6 @@ void CLAN::onInit(uint8_t *mac)
 
 }
 
-void CLAN::onClearIrqFlags(void)
-{
-   // clear interrupt flags
-   this->enc28j60_wcr(EIR, 0x00);
-}
-
 void CLAN::onSend(uint8_t *data, uint16_t len)
 {
    this->enc28j60_send_packet(data, len);
@@ -592,9 +564,7 @@ void CSPI::onClrReset(void)
 
 void CSPI::enc28j60_tx(uint8_t data)
 {
-
    HAL_SPI_Transmit(&hspi3, &data, 1, 1);
-
 }
 
 uint8_t CSPI::enc28j60_rx(void)
@@ -659,134 +629,6 @@ uint16_t CSPI::enc28j60_rcr16(uint8_t adr)
 	uint16_t res0 = (uint16_t)enc28j60_read_op(ENC28J60_SPI_RCR, adr);
 	uint16_t res1 = (uint16_t)enc28j60_read_op(ENC28J60_SPI_RCR, adr);
 	return (res0 | (res1 << 8));
-}
-
-void CSPI::enc28j60_clrRxPackCount(void)
-{
-   enc28j60_wcr(EPKTCNT, 0);
-   //gNextPacketPtr = ENC28J60_RXSTART;
-   //unreleasedPacket = false;
-}
-
-uint16_t CSPI::ENC28J60_GetReceivedPacketLength()
-{
-    uint8_t header[6];  //
-    uint16_t packetLength = 0;
-
-    //  ENC28J60 (NSS = LOW)
-   this->onSetSelect();
-
-    //  READ BUFFER MEMORY (0x3A)
-    uint8_t command = 0x3A;
-    HAL_SPI_Transmit(&hspi3, &command, 1, 1);
-
-    //
-    HAL_SPI_Receive(&hspi3, header, 6, 3);
-
-    //  ENC28J60 (NSS = HIGH)
-    this->onClrSelect();
-
-    //
-    packetLength = (header[2] | (header[3] << 8));
-
-    //
-    if (packetLength > 4)
-        packetLength -= 4;
-
-    return packetLength;
-}
-
-void CSPI::enc28j60_prnt8(uint8_t adr)
-{
-   enc28j60_set_bank(adr);
-	uint8_t res = enc28j60_read_op(ENC28J60_SPI_RCR, adr);
-
-   printf("a:0x%02X v:0x%02X, bin: ", adr, res);
-   uint8_t d = 0;
-
-   d = 0x01 & (res>>7);
-   printf("%d", d);
-   d = 0x01 & (res>>6);
-   printf("%d", d);
-   d = 0x01 & (res>>5);
-   printf("%d", d);
-   d = 0x01 & (res>>4);
-   printf("%d", d);
-   printf(" ");
-   d = 0x01 & (res>>3);
-   printf("%d", d);
-   d = 0x01 & (res>>2);
-   printf("%d", d);
-   d = 0x01 & (res>>1);
-   printf("%d", d);
-   d = 0x01 & (res);
-   printf("%d", d);
-   printf("\r\n");
-}
-
-void CSPI::enc28j60_prnt16(uint8_t adr)
-{
-   enc28j60_set_bank(adr);
-	uint16_t res0 = (uint16_t)enc28j60_read_op(ENC28J60_SPI_RCR, adr);
-	uint16_t res1 = (uint16_t)enc28j60_read_op(ENC28J60_SPI_RCR, adr);
-   uint16_t res = (res0 | (res1 << 8));
-
-   printf("a:0x%02X v:0x%04X, bin: ", adr, res);
-   uint8_t d = 0;
-   d = 0x01 & (res>>15);
-   printf("%d", d);
-   d = 0x01 & (res>>14);
-   printf("%d", d);
-   d = 0x01 & (res>>13);
-   printf("%d", d);
-   d = 0x01 & (res>>12);
-   printf("%d", d);
-   printf(" ");
-   d = 0x01 & (res>>11);
-   printf("%d", d);
-   d = 0x01 & (res>>10);
-   printf("%d", d);
-   d = 0x01 & (res>>9);
-   printf("%d", d);
-   d = 0x01 & (res>>8);
-   printf("%d", d);
-   printf("  ");
-
-   d = 0x01 & (res>>7);
-   printf("%d", d);
-   d = 0x01 & (res>>6);
-   printf("%d", d);
-   d = 0x01 & (res>>5);
-   printf("%d", d);
-   d = 0x01 & (res>>4);
-   printf("%d", d);
-   printf(" ");
-   d = 0x01 & (res>>3);
-   printf("%d", d);
-   d = 0x01 & (res>>2);
-   printf("%d", d);
-   d = 0x01 & (res>>1);
-   printf("%d", d);
-   d = 0x01 & (res);
-   printf("%d", d);
-   printf("\r\n");
-}
-
-void CSPI::enc28j60_decrCounter(void)
-{
-//   enc28j60_set_bank(ECON2);
-//   enc28j60_bfs(ECON2, ECON2_PKTDEC);
-
-   uint8_t data1 = 0;
-   enc28j60_set_bank(ECON2);
-   delay_us(1);
-   this->onSetSelect();
-   data1 = (ENC28J60_SPI_BFS | (ECON2 & ENC28J60_ADDR_MASK));
-   HAL_SPI_Transmit(&hspi3, &data1, 1, 1);
-   data1 = ECON2_PKTDEC;
-   HAL_SPI_Transmit(&hspi3, &data1, 1, 1);
-   delay_us(1);
-   this->onClrSelect();
 }
 
 // Write register
