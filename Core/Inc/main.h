@@ -58,7 +58,7 @@ void _Error_Handler(char * file, int line);
 /* Exported functions prototypes ---------------------------------------------*/
 //void Error_Handler(void);
 void SystemClock_Config(void);
-void handleRxIrqLanA(void);
+//void handleRxIrqLanA(void);
 void onStopTXMB(void);
 void showPack(uint8_t *data, uint32_t len);
 void handleRxUSB(uint8_t *data, uint16_t len);

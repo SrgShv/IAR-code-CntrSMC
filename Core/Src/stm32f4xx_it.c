@@ -225,7 +225,7 @@ void USART2_IRQHandler(void)
 {
 //  if(__HAL_UART_GET_FLAG(&huart2, UART_FLAG_TC))
 //  {
-    
+
     //printf("Tx RS485 finished\n\r");
     //setEnableRS485TX(false);
     //onStopTXMB();
@@ -281,11 +281,11 @@ void EXTI2_IRQHandler(void)   /** LAN-A; SPI-3 **/
 {
    //handleRxIrqLanA();
    HAL_GPIO_EXTI_IRQHandler(GPIO_PIN_2);
-   if(__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_2) != RESET)
-   {
-      __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_2);
-   };
-   handleRxIrqLanA();
+//   if(__HAL_GPIO_EXTI_GET_IT(GPIO_PIN_2) != RESET)
+//   {
+//      __HAL_GPIO_EXTI_CLEAR_IT(GPIO_PIN_2);
+//   };
+//   handleRxIrqLanA();
    //printf("<!>\n");
    //handleRxIrqLanA();
 }
